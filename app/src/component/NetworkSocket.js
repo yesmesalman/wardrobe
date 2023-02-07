@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import io from 'socket.io-client';
 import Global from "./Global";
+import DeviceInfo from 'react-native-device-info';
 
 const NetworkSocket = ({ children }) => {
     const [socket, setSocket] = useState(null);
