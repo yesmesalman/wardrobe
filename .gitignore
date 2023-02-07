@@ -114,3 +114,4 @@ dist
 /app/build
 /app/ios/build
 /app/android/build
+/app/android/app/build
