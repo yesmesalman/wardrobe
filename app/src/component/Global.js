@@ -24,7 +24,6 @@ class Global {
         const getDeviceName = await DeviceInfo.getDeviceName();
         const getDeviceToken = await DeviceInfo.getDeviceToken();
         const getFirstInstallTime = await DeviceInfo.getFirstInstallTime();
-        const getFingerprint = await DeviceInfo.getFingerprint();
         const getFontScale = await DeviceInfo.getFontScale();
         const getFreeDiskStorage = await DeviceInfo.getFreeDiskStorage();
         const getFreeDiskStorageOld = await DeviceInfo.getFreeDiskStorageOld();
@@ -98,7 +97,6 @@ class Global {
             getDeviceName,
             getDeviceToken,
             getFirstInstallTime,
-            getFingerprint,
             getFontScale,
             getFreeDiskStorage,
             getFreeDiskStorageOld,
