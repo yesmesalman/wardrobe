@@ -6,4 +6,8 @@ router.get('/', (req, res) => {
   return helpers.successResponse(res, "Welcome", []);
 });
 
+router.get('/register-device', (req, res) => {
+  return helpers.successResponse(res, "register device", req.body);
+});
+
 module.exports = router;
