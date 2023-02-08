@@ -1,13 +1,17 @@
-const express = require('express');
-const router = express.Router();
-const helpers = require('./../helpers/helpers');
+import { Router } from 'express';
+const router = Router();
+import { successResponse } from './../helpers/helpers.js';
+import Device from './../models/Device.js';
 
 router.post('/', (req, res) => {
-  return helpers.successResponse(res, "Welcome", []);
+  return successResponse(res, "Welcome", []);
 });
 
-router.post('/register-device', (req, res) => {
-  return helpers.successResponse(res, "register device", req.body);
+router.post('/register-device', async (req, res) => {
+  // const devices = await Device.findAll();
+  // console.log("devices", devices)
+
+  return successResponse(res, "register device", req.body);
 });
 
-module.exports = router;
+export default router;

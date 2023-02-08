@@ -6,4 +6,4 @@ const errorResponse = (res, errorMessage) => {
     return res.status(500).json({ success: false, message: errorMessage });
 }
 
-module.exports = { successResponse, errorResponse };
+export { successResponse, errorResponse };

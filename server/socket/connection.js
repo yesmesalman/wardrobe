@@ -1,5 +1,7 @@
-const connection = (http) => {
-    const io = require('socket.io')(http);
+import { Server } from 'socket.io';
+
+const connection = (httpServer) => {
+    const io = new Server(httpServer, { cors: { origin: '*' } });
 
     io.on('connection', (socket) => {
         console.log('a user connected');
@@ -9,4 +11,4 @@ const connection = (http) => {
     });
 }
 
-module.exports = connection;
+export default connection;

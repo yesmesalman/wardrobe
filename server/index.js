@@ -1,29 +1,33 @@
-const express = require('express');
+import express from 'express';
 const app = express();
-const http = require('http').createServer(app);
-const SocketConnection = require('./socket/connection');
-const authRoutes = require('./routes/auth');
-const bodyParser = require('body-parser');
-var multer = require('multer');
+
+import http from 'http';
+const server = http.createServer(app);
+
+import bodyParser from 'body-parser';
+const { json, urlencoded } = bodyParser;
+import multer from 'multer';
 var upload = multer();
 
+import { default as SocketConnection } from './socket/connection.js';
+import authRoutes from './routes/auth.js';
+
 // Socket Module
-SocketConnection(http);
+SocketConnection(server);
 
 // for parsing application/json
-app.use(bodyParser.json()); 
+app.use(json());
 
 // for parsing application/xwww-
-app.use(bodyParser.urlencoded({ extended: true })); 
+app.use(urlencoded({ extended: true }));
 //form-urlencoded
 
 // for parsing multipart/form-data
-app.use(upload.array()); 
-app.use(express.static('public'));
+app.use(upload.array());
 
 // routes
 app.use('/api', authRoutes); // Auth routes
 
-http.listen(3000, () => {
+server.listen(3000, () => {
   console.log('listening on *:3000');
 });
