@@ -5,13 +5,13 @@ const sequelize = new Sequelize('wardrobe', 'root', '', {
     dialect: 'mysql'
 });
 
-// sequelize
-//     .authenticate()
-//     .then(() => {
-//         console.log('Connection has been established successfully.');
-//     })
-//     .catch(err => {
-//         console.error('Unable to connect to the database:', err);
-//     });
+sequelize
+    .authenticate()
+    .then(() => {
+        console.log('Database connected...');
+    })
+    .catch(err => {
+        console.error('Unable to connect to the database:', err);
+    });
 
 export default sequelize;
