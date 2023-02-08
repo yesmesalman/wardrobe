@@ -10,7 +10,7 @@ import multer from 'multer';
 var upload = multer();
 
 import { default as SocketConnection } from './socket/connection.js';
-import authRoutes from './routes/auth.js';
+import authRoutes from './routes/auth/index.js';
 
 // Socket Module
 SocketConnection(server);

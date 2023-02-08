@@ -1,9 +1,13 @@
-const successResponse = (res, successMessage, data) => {
-    return res.json({ success: true, message: successMessage, data });
+const successResponse = (res, message, data) => {
+    return res.json({ success: true, message, data });
 }
 
-const errorResponse = (res, errorMessage) => {
-    return res.status(500).json({ success: false, message: errorMessage });
+const errorResponse = (res, message) => {
+    return res.status(400).json({ success: false, message });
 }
 
-export { successResponse, errorResponse };
+const validationErrorResponse = (res, arr) => {
+    return res.status(500).json({ success: false, message: arr[0].msg, data: arr });
+}
+
+export { successResponse, errorResponse, validationErrorResponse };
