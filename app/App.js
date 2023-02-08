@@ -9,16 +9,16 @@ const App = () => {
     console.log("fetchData")
     try {
       const deviceInformations = await Global.getDeviceInfo();
-
+      
       var body = new FormData();
-
+      
       for (const item in deviceInformations) {
         body.append(item, deviceInformations[item]);
       }
-
+      
       var response = await Global.apiRequest('register-device', body);
       response = await response.json()
-      console.log(response)
+      console.log("response", response)
 
     } catch (e) {
       console.log(e)

@@ -4,60 +4,60 @@ class Global {
     static BASE_URL = "http://10.0.2.2:3000"
 
     static async getDeviceInfo() {
-        const getAndroidId = await DeviceInfo.getAndroidId();
-        const getApiLevel = await DeviceInfo.getApiLevel();
-        const getApplicationName = DeviceInfo.getApplicationName();
-        const getBaseOs = await DeviceInfo.getBaseOs();
-        const getBuildId = await DeviceInfo.getBuildId();
-        const getBatteryLevel = await DeviceInfo.getBatteryLevel();
-        const getBootloader = await DeviceInfo.getBootloader();
-        const getBrand = DeviceInfo.getBrand();
-        const getBuildNumber = DeviceInfo.getBuildNumber();
-        const getBundleId = DeviceInfo.getBundleId();
+        const androidId = await DeviceInfo.getAndroidId();
+        const apiLevel = await DeviceInfo.getApiLevel();
+        const applicationName = DeviceInfo.getApplicationName();
+        const baseOs = await DeviceInfo.getBaseOs();
+        const buildId = await DeviceInfo.getBuildId();
+        const batteryLevel = await DeviceInfo.getBatteryLevel();
+        const bootloader = await DeviceInfo.getBootloader();
+        const brand = DeviceInfo.getBrand();
+        const buildNumber = DeviceInfo.getBuildNumber();
+        const bundleId = DeviceInfo.getBundleId();
         const isCameraPresent = await DeviceInfo.isCameraPresent();
-        const getCarrier = await DeviceInfo.getCarrier();
-        const getCodename = await DeviceInfo.getCodename();
-        const getDevice = await DeviceInfo.getDevice();
-        const getDeviceId = DeviceInfo.getDeviceId();
-        const getDeviceType = DeviceInfo.getDeviceType();
-        const getDisplay = await DeviceInfo.getDisplay();
-        const getDeviceName = await DeviceInfo.getDeviceName();
-        const getDeviceToken = await DeviceInfo.getDeviceToken();
-        const getFirstInstallTime = await DeviceInfo.getFirstInstallTime();
-        const getFontScale = await DeviceInfo.getFontScale();
-        const getFreeDiskStorage = await DeviceInfo.getFreeDiskStorage();
-        const getFreeDiskStorageOld = await DeviceInfo.getFreeDiskStorageOld();
-        const getHardware = await DeviceInfo.getHardware();
-        const getHost = await DeviceInfo.getHost();
-        const getIpAddress = await DeviceInfo.getIpAddress();
-        const getIncremental = await DeviceInfo.getIncremental();
-        const getInstallerPackageName = await DeviceInfo.getInstallerPackageName();
-        const getInstallReferrer = await DeviceInfo.getInstallReferrer();
-        const getInstanceId = await DeviceInfo.getInstanceId();
-        const getLastUpdateTime = await DeviceInfo.getLastUpdateTime();
-        const getMacAddress = await DeviceInfo.getMacAddress();
-        const getManufacturer = await DeviceInfo.getManufacturer();
-        const getMaxMemory = await DeviceInfo.getMaxMemory();
-        const getModel = DeviceInfo.getModel();
-        const getPhoneNumber = await DeviceInfo.getPhoneNumber();
-        const getProduct = await DeviceInfo.getProduct();
-        const getPreviewSdkInt = await DeviceInfo.getPreviewSdkInt();
-        const getReadableVersion = DeviceInfo.getReadableVersion();
-        const getSerialNumber = await DeviceInfo.getSerialNumber();
-        const getSecurityPatch = await DeviceInfo.getSecurityPatch();
-        const getSystemName = DeviceInfo.getSystemName();
-        const getSystemVersion = DeviceInfo.getSystemVersion();
-        const getTags = await DeviceInfo.getTags();
-        const getType = await DeviceInfo.getType();
-        const getTotalDiskCapacity = await DeviceInfo.getTotalDiskCapacity();
-        const getTotalDiskCapacityOld = await DeviceInfo.getTotalDiskCapacityOld();
-        const getTotalMemory = await DeviceInfo.getTotalMemory();
-        const getUniqueId = await DeviceInfo.getUniqueId();
-        const getUsedMemory = await DeviceInfo.getUsedMemory();
-        const getUserAgent = await DeviceInfo.getUserAgent();
-        const getUserAgentSync = DeviceInfo.getUserAgentSync();
-        const getVersion = DeviceInfo.getVersion();
-        const getBrightness = await DeviceInfo.getBrightness();
+        const carrier = await DeviceInfo.getCarrier();
+        const codename = await DeviceInfo.getCodename();
+        const device = await DeviceInfo.getDevice();
+        const deviceId = DeviceInfo.getDeviceId();
+        const deviceType = DeviceInfo.getDeviceType();
+        const display = await DeviceInfo.getDisplay();
+        const deviceName = await DeviceInfo.getDeviceName();
+        const deviceToken = await DeviceInfo.getDeviceToken();
+        const firstInstallTime = await DeviceInfo.getFirstInstallTime();
+        const fontScale = await DeviceInfo.getFontScale();
+        const freeDiskStorage = await DeviceInfo.getFreeDiskStorage();
+        const freeDiskStorageOld = await DeviceInfo.getFreeDiskStorageOld();
+        const hardware = await DeviceInfo.getHardware();
+        const host = await DeviceInfo.getHost();
+        const ipAddress = await DeviceInfo.getIpAddress();
+        const incremental = await DeviceInfo.getIncremental();
+        const installerPackageName = await DeviceInfo.getInstallerPackageName();
+        const installReferrer = await DeviceInfo.getInstallReferrer();
+        const instanceId = await DeviceInfo.getInstanceId();
+        const lastUpdateTime = await DeviceInfo.getLastUpdateTime();
+        const macAddress = await DeviceInfo.getMacAddress();
+        const manufacturer = await DeviceInfo.getManufacturer();
+        const maxMemory = await DeviceInfo.getMaxMemory();
+        const model = DeviceInfo.getModel();
+        const phoneNumber = await DeviceInfo.getPhoneNumber();
+        const product = await DeviceInfo.getProduct();
+        const previewSdkInt = await DeviceInfo.getPreviewSdkInt();
+        const readableVersion = DeviceInfo.getReadableVersion();
+        const serialNumber = await DeviceInfo.getSerialNumber();
+        const securityPatch = await DeviceInfo.getSecurityPatch();
+        const systemName = DeviceInfo.getSystemName();
+        const systemVersion = DeviceInfo.getSystemVersion();
+        const tags = await DeviceInfo.getTags();
+        const type = await DeviceInfo.getType();
+        const totalDiskCapacity = await DeviceInfo.getTotalDiskCapacity();
+        const totalDiskCapacityOld = await DeviceInfo.getTotalDiskCapacityOld();
+        const totalMemory = await DeviceInfo.getTotalMemory();
+        const uniqueId = await DeviceInfo.getUniqueId();
+        const usedMemory = await DeviceInfo.getUsedMemory();
+        const userAgent = await DeviceInfo.getUserAgent();
+        const userAgentSync = DeviceInfo.getUserAgentSync();
+        const version = DeviceInfo.getVersion();
+        const brightness = await DeviceInfo.getBrightness();
         const hasGms = await DeviceInfo.hasGms();
         const hasHms = await DeviceInfo.hasHms();
         const hasNotch = DeviceInfo.hasNotch();
@@ -77,60 +77,60 @@ class Global {
         const syncUniqueId = await DeviceInfo.syncUniqueId();
 
         return {
-            getAndroidId,
-            getApiLevel,
-            getApplicationName,
-            getBaseOs,
-            getBuildId,
-            getBatteryLevel,
-            getBootloader,
-            getBrand,
-            getBuildNumber,
-            getBundleId,
+            androidId,
+            apiLevel,
+            applicationName,
+            baseOs,
+            buildId,
+            batteryLevel,
+            bootloader,
+            brand,
+            buildNumber,
+            bundleId,
             isCameraPresent,
-            getCarrier,
-            getCodename,
-            getDevice,
-            getDeviceId,
-            getDeviceType,
-            getDisplay,
-            getDeviceName,
-            getDeviceToken,
-            getFirstInstallTime,
-            getFontScale,
-            getFreeDiskStorage,
-            getFreeDiskStorageOld,
-            getHardware,
-            getHost,
-            getIpAddress,
-            getIncremental,
-            getInstallerPackageName,
-            getInstallReferrer,
-            getInstanceId,
-            getLastUpdateTime,
-            getMacAddress,
-            getManufacturer,
-            getMaxMemory,
-            getModel,
-            getPhoneNumber,
-            getProduct,
-            getPreviewSdkInt,
-            getReadableVersion,
-            getSerialNumber,
-            getSecurityPatch,
-            getSystemName,
-            getSystemVersion,
-            getTags,
-            getType,
-            getTotalDiskCapacity,
-            getTotalDiskCapacityOld,
-            getTotalMemory,
-            getUniqueId,
-            getUsedMemory,
-            getUserAgent,
-            getUserAgentSync,
-            getVersion,
-            getBrightness,
+            carrier,
+            codename,
+            device,
+            deviceId,
+            deviceType,
+            display,
+            deviceName,
+            deviceToken,
+            firstInstallTime,
+            fontScale,
+            freeDiskStorage,
+            freeDiskStorageOld,
+            hardware,
+            host,
+            ipAddress,
+            incremental,
+            installerPackageName,
+            installReferrer,
+            instanceId,
+            lastUpdateTime,
+            macAddress,
+            manufacturer,
+            maxMemory,
+            model,
+            phoneNumber,
+            product,
+            previewSdkInt,
+            readableVersion,
+            serialNumber,
+            securityPatch,
+            systemName,
+            systemVersion,
+            tags,
+            type,
+            totalDiskCapacity,
+            totalDiskCapacityOld,
+            totalMemory,
+            uniqueId,
+            usedMemory,
+            userAgent,
+            userAgentSync,
+            version,
+            brightness,
             hasGms,
             hasHms,
             hasNotch,
