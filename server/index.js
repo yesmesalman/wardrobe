@@ -16,14 +16,15 @@ import authRoutes from './routes/auth/index.js';
 SocketConnection(server);
 
 // for parsing application/json
-app.use(json());
+app.use(bodyParser.json()); 
 
 // for parsing application/xwww-
-app.use(urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({ extended: true })); 
 //form-urlencoded
 
 // for parsing multipart/form-data
-app.use(upload.array());
+app.use(upload.array()); 
+app.use(express.static('public'));
 
 // routes
 app.use('/api', authRoutes); // Auth routes
