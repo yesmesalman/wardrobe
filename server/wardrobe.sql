@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 5.2.0
+-- version 5.1.0
 -- https://www.phpmyadmin.net/
 --
--- Host: 127.0.0.1
--- Generation Time: Feb 07, 2023 at 01:00 PM
--- Server version: 10.4.27-MariaDB
--- PHP Version: 7.4.33
+-- Host: localhost
+-- Generation Time: Feb 11, 2023 at 04:19 PM
+-- Server version: 10.4.18-MariaDB
+-- PHP Version: 7.4.16
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -102,7 +102,14 @@ CREATE TABLE `devices` (
   `syncUniqueId` varchar(100) DEFAULT NULL,
   `createdAt` datetime DEFAULT current_timestamp(),
   `updatedAt` datetime DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Dumping data for table `devices`
+--
+
+INSERT INTO `devices` (`id`, `uniqueId`, `apiLevel`, `applicationName`, `baseOs`, `buildId`, `batteryLevel`, `bootloader`, `brand`, `buildNumber`, `bundleId`, `carrier`, `codename`, `device`, `deviceId`, `deviceName`, `deviceToken`, `deviceType`, `display`, `firstInstallTime`, `fontScale`, `freeDiskStorage`, `freeDiskStorageOld`, `hardware`, `host`, `incremental`, `installReferrer`, `installerPackageName`, `instanceId`, `ipAddress`, `lastUpdateTime`, `macAddress`, `manufacturer`, `maxMemory`, `model`, `phoneNumber`, `previewSdkInt`, `product`, `readableVersion`, `securityPatch`, `serialNumber`, `systemName`, `systemVersion`, `tags`, `totalDiskCapacity`, `totalDiskCapacityOld`, `totalMemory`, `type`, `androidId`, `usedMemory`, `userAgent`, `userAgentSync`, `version`, `brightness`, `hasDynamicIsland`, `hasGms`, `hasHms`, `hasNotch`, `hasSystemFeature`, `isAirplaneMode`, `isBatteryCharging`, `isCameraPresent`, `isEmulator`, `isHeadphonesConnected`, `isKeyboardConnected`, `isLandscape`, `isLocationEnabled`, `isMouseConnected`, `isPinOrFingerprintSet`, `isTablet`, `isTabletMode`, `syncUniqueId`, `createdAt`, `updatedAt`) VALUES
+(1, 'A9EB4A06-C681-4795-9B3F-BA3427133031', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2023-02-10 22:58:55', '2023-02-10 22:58:55');
 
 --
 -- Indexes for dumped tables
@@ -122,7 +129,7 @@ ALTER TABLE `devices`
 -- AUTO_INCREMENT for table `devices`
 --
 ALTER TABLE `devices`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
