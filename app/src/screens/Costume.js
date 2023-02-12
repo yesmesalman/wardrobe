@@ -8,12 +8,11 @@ import {
 import Template from "./../component/Template";
 import Styles from "./../component/Styles";
 import Card from "./../component/item/Card";
-import AddItemBar from "./../component/item/AddItemBar";
 
 function Costume() {
   return (
     <Template>
-      <View style={[Styles.container, {backgroundColor: "green"}]}>
+      <View style={[Styles.container]}>
         <View style={[Styles.margin5]} />
         <View style={styles.itemHeadingRow}>
           <Text style={Styles.h1}>Shirts</Text>
@@ -47,7 +46,6 @@ function Costume() {
           <Card />
           <Card />
         </ScrollView>
-        <AddItemBar />
       </View>
     </Template>
   );

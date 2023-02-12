@@ -1,10 +1,14 @@
 import { Text, View } from "react-native";
+import Template from "./../component/Template";
+import Styles from "./../component/Styles";
 
 function Explore() {
   return (
-    <View>
-      <Text>Explore</Text>
-    </View>
+    <Template>
+      <View style={[Styles.container]}>
+        <Text>Explore</Text>
+      </View>
+    </Template>
   );
 }
 
