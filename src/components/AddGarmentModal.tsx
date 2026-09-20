@@ -22,6 +22,7 @@ import {
 import type {Align, GarmentKind, Variant} from '../types';
 import {Cutout, GarmentView, GarmentViewHandle, Photo} from './GarmentView';
 import {SegmentedControl} from './SegmentedControl';
+import {ZoomControl} from './ZoomControl';
 
 export interface GarmentDraft {
   kind: GarmentKind;
@@ -195,7 +196,7 @@ export function AddGarmentModal({
         </View>
         <Text style={styles.hint}>
           {aligning
-            ? 'Drag to move, pinch to resize. Match the blue outline.'
+            ? 'Drag to move, pinch or use − / + to zoom. Match the blue outline.'
             : 'Drag to rotate'}
         </Text>
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
@@ -220,12 +221,18 @@ export function AddGarmentModal({
               </Text>
             </Pressable>
             {aligning ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => view.current?.resetAlign()}
-                style={styles.chip}>
-                <Text style={styles.chipText}>Reset</Text>
-              </Pressable>
+              <View style={styles.alignTools}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => view.current?.resetAlign()}
+                  style={styles.chip}>
+                  <Text style={styles.chipText}>Reset</Text>
+                </Pressable>
+                <ZoomControl
+                  percent={Math.round(align.sx * 100)}
+                  onZoom={factor => view.current?.zoomAlign(factor)}
+                />
+              </View>
             ) : (
               <View style={styles.switchRow}>
                 <Text style={styles.switchLabel}>Remove background</Text>
@@ -333,6 +340,7 @@ const styles = StyleSheet.create({
   chipOn: {backgroundColor: theme.accent},
   chipText: {color: theme.accent, fontSize: 14, fontWeight: '600'},
   chipTextOn: {color: theme.accentText},
+  alignTools: {flexDirection: 'row', alignItems: 'center', gap: 8},
   switchRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
   switchLabel: {color: theme.ink, fontSize: 14},
   sectionLabel: {

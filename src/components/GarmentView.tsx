@@ -33,6 +33,8 @@ export interface GarmentViewHandle {
   processPhoto: (photoBase64: string, removeBackground: boolean) => Promise<Cutout>;
   /** Puts the photo back to the automatic fit. */
   resetAlign: () => void;
+  /** Zooms the photo over the model by `factor` (1.1 = 10% bigger). */
+  zoomAlign: (factor: number) => void;
 }
 
 interface Props {
@@ -185,6 +187,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
           );
         },
         resetAlign: () => run('window.__resetAlign()'),
+        zoomAlign: factor => run(`window.__zoomAlign(${factor})`),
       }),
       [ready, request, run],
     );

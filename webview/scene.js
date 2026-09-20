@@ -17,7 +17,7 @@
  *       each: null or {id, variant, photo, mode, color, align, slide}
  *   __setAutoRotate(bool)
  *   __setView('3d' | 'align')                 3D view or 2D alignment view
- *   __setAlign({sx, sy, ox, oy}), __resetAlign()
+ *   __setAlign({sx, sy, ox, oy}), __zoomAlign(factor), __resetAlign()
  *   __processPhoto(id, dataUrl, removeBackground)  cut the garment out
  *   __snapshot(id)                            JPEG still for library cards
  * and reports back with window.ReactNativeWebView.postMessage.
@@ -50,6 +50,8 @@ const ALIGN_COLOR = '#9fb0c4'; // model colour while aligning the photo
 const ANALYSIS_SIZE = 400; // px, longest side used to find the garment
 const CUTOUT_SIZE = 800; // px, longest side of the stored cut-out
 const DEFAULT_ALIGN = {sx: 1, sy: 1, ox: 0, oy: 0};
+const ZOOM_MIN = 0.3;
+const ZOOM_MAX = 4;
 
 const post = message =>
   window.ReactNativeWebView &&
@@ -553,8 +555,8 @@ function moveAlign(dx, dy) {
 }
 
 function scaleAlign(factor) {
-  state.align.sx = clamp(state.align.sx * factor, 0.3, 3);
-  state.align.sy = clamp(state.align.sy * factor, 0.3, 3);
+  state.align.sx = clamp(state.align.sx * factor, ZOOM_MIN, ZOOM_MAX);
+  state.align.sy = clamp(state.align.sy * factor, ZOOM_MIN, ZOOM_MAX);
   applyAlign();
 }
 
@@ -1046,6 +1048,11 @@ window.__setView = view => {
 window.__setAlign = align => {
   state.align = {...DEFAULT_ALIGN, ...align};
   applyAlign();
+};
+/** Zooms the photo over the model (from the app's +/- buttons). */
+window.__zoomAlign = factor => {
+  scaleAlign(factor);
+  post({type: 'align', align: state.align});
 };
 window.__resetAlign = () => {
   state.align = {...DEFAULT_ALIGN};
