@@ -15,49 +15,59 @@ import {
   DEFAULT_ALIGN,
   DEFAULT_COLOR,
   GARMENT_COLORS,
-  KIND_LABELS,
   MAX_PER_KIND,
   theme,
+  VARIANTS,
 } from '../constants';
-import type {Align, GarmentKind, PhotoMode} from '../types';
+import type {Align, GarmentKind, Variant} from '../types';
 import {Cutout, GarmentView, GarmentViewHandle, Photo} from './GarmentView';
 import {SegmentedControl} from './SegmentedControl';
 
 export interface GarmentDraft {
   kind: GarmentKind;
-  mode: PhotoMode;
+  variant: Variant;
   color: string;
   align: Align;
-  /** Base64 PNG of the garment cut out of the photo (fit mode). */
-  cutoutBase64?: string;
+  /** Base64 PNG of the garment cut out of the photo. */
+  cutoutBase64: string;
   thumbBase64: string;
 }
 
-interface Props {
-  /** Base64 JPEG of the freshly picked photo; the modal is open while set. */
+export interface AddGarmentProps {
+  /** Base64 JPEG of the freshly picked photo; the screen is open while set. */
   photoBase64: string | null;
-  initialKind: GarmentKind;
-  isFull: (kind: GarmentKind) => boolean;
+  /** True when the library already holds the maximum of this kind. */
+  full: boolean;
   onSave: (draft: GarmentDraft) => Promise<void>;
   onRetake: () => void;
   onCancel: () => void;
 }
 
+interface Props extends AddGarmentProps {
+  kind: GarmentKind;
+  title: string;
+}
+
 const errorMessage = (e: unknown) =>
   e instanceof Error ? e.message : 'Something went wrong.';
 
+/**
+ * Add screen shared by shirts and pants: the photographed garment is cut out
+ * and fitted onto the blank 3D model of the chosen variant.
+ */
 export function AddGarmentModal({
+  kind,
+  title,
   photoBase64,
-  initialKind,
-  isFull,
+  full,
   onSave,
   onRetake,
   onCancel,
 }: Props) {
   const insets = useSafeAreaInsets();
   const view = useRef<GarmentViewHandle>(null);
-  const [kind, setKind] = useState(initialKind);
-  const [mode, setMode] = useState<PhotoMode>('fit');
+  const variants = VARIANTS[kind];
+  const [variant, setVariant] = useState<Variant>(variants[0].value);
   const [pickedColor, setPickedColor] = useState<string | null>(null);
   const [removeBackground, setRemoveBackground] = useState(true);
   const [cutout, setCutout] = useState<Cutout | null>(null);
@@ -73,8 +83,7 @@ export function AddGarmentModal({
   // Start fresh every time a new photo arrives.
   useEffect(() => {
     if (photoBase64) {
-      setKind(initialKind);
-      setMode('fit');
+      setVariant(variants[0].value);
       setPickedColor(null);
       setRemoveBackground(true);
       setCutout(null);
@@ -82,11 +91,11 @@ export function AddGarmentModal({
       setScene('3d');
       setNotice(null);
     }
-  }, [photoBase64, initialKind]);
+  }, [photoBase64, variants]);
 
-  // Fit mode: cut the garment out of the photo.
+  // Cut the garment out of the photo.
   useEffect(() => {
-    if (!photoBase64 || mode !== 'fit') {
+    if (!photoBase64) {
       return;
     }
     let cancelled = false;
@@ -111,24 +120,15 @@ export function AddGarmentModal({
     return () => {
       cancelled = true;
     };
-  }, [photoBase64, mode, removeBackground]);
+  }, [photoBase64, removeBackground]);
 
-  const changeMode = (next: PhotoMode) => {
-    setMode(next);
-    if (next === 'print') {
-      setScene('3d');
-    }
+  const shownPhoto: Photo | null = cutout && {
+    base64: cutout.base64,
+    mime: 'image/png',
   };
 
-  const shownPhoto: Photo | null =
-    mode === 'fit'
-      ? cutout && {base64: cutout.base64, mime: 'image/png'}
-      : photoBase64
-        ? {base64: photoBase64, mime: 'image/jpeg'}
-        : null;
-
   const save = async () => {
-    if (mode === 'fit' && (processing || !cutout)) {
+    if (processing || !cutout) {
       Alert.alert('One moment', 'The photo is still being prepared.');
       return;
     }
@@ -140,10 +140,10 @@ export function AddGarmentModal({
       }
       await onSave({
         kind,
-        mode,
+        variant,
         color,
         align,
-        cutoutBase64: mode === 'fit' ? cutout?.base64 : undefined,
+        cutoutBase64: cutout.base64,
         thumbBase64,
       });
     } catch (e) {
@@ -153,8 +153,8 @@ export function AddGarmentModal({
     }
   };
 
-  const aligning = mode === 'fit' && scene === 'align';
-  const blocked = saving || isFull(kind);
+  const aligning = scene === 'align';
+  const blocked = saving || full;
 
   return (
     <Modal
@@ -167,7 +167,7 @@ export function AddGarmentModal({
           <Pressable onPress={onCancel} hitSlop={12} disabled={saving}>
             <Text style={styles.headerAction}>Cancel</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>New garment</Text>
+          <Text style={styles.headerTitle}>{title}</Text>
           <Pressable onPress={onRetake} hitSlop={12} disabled={saving}>
             <Text style={styles.headerAction}>Retake</Text>
           </Pressable>
@@ -176,10 +176,10 @@ export function AddGarmentModal({
         <View style={styles.scene}>
           <GarmentView
             ref={view}
-            kind={kind}
+            variant={variant}
             color={color}
             photo={shownPhoto}
-            mode={mode}
+            mode="fit"
             align={align}
             view={aligning ? 'align' : '3d'}
             onAlignChange={setAlign}
@@ -204,61 +204,41 @@ export function AddGarmentModal({
           style={styles.controls}
           contentContainerStyle={{paddingBottom: insets.bottom + 16}}>
           <SegmentedControl
-            value={kind}
-            onChange={setKind}
-            options={(['shirt', 'pants'] as const).map(value => ({
-              value,
-              label: isFull(value)
-                ? `${KIND_LABELS[value].plural} (full)`
-                : KIND_LABELS[value].plural,
-              disabled: isFull(value),
-            }))}
+            value={variant}
+            onChange={setVariant}
+            options={variants}
           />
 
-          <View style={styles.gap} />
-          <SegmentedControl
-            value={mode}
-            onChange={changeMode}
-            options={[
-              {value: 'fit', label: 'Fit photo to garment'},
-              {value: 'print', label: 'Print / logo'},
-            ]}
-          />
-
-          {mode === 'fit' ? (
-            <View style={styles.fitRow}>
+          <View style={styles.fitRow}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={processing || !cutout}
+              onPress={() => setScene(aligning ? '3d' : 'align')}
+              style={[styles.chip, aligning && styles.chipOn]}>
+              <Text style={[styles.chipText, aligning && styles.chipTextOn]}>
+                {aligning ? 'Done adjusting' : 'Adjust fit'}
+              </Text>
+            </Pressable>
+            {aligning ? (
               <Pressable
                 accessibilityRole="button"
-                disabled={processing || !cutout}
-                onPress={() => setScene(aligning ? '3d' : 'align')}
-                style={[styles.chip, aligning && styles.chipOn]}>
-                <Text style={[styles.chipText, aligning && styles.chipTextOn]}>
-                  {aligning ? 'Done adjusting' : 'Adjust fit'}
-                </Text>
+                onPress={() => view.current?.resetAlign()}
+                style={styles.chip}>
+                <Text style={styles.chipText}>Reset</Text>
               </Pressable>
-              {aligning ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => view.current?.resetAlign()}
-                  style={styles.chip}>
-                  <Text style={styles.chipText}>Reset</Text>
-                </Pressable>
-              ) : (
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Remove background</Text>
-                  <Switch
-                    value={removeBackground}
-                    onValueChange={setRemoveBackground}
-                    disabled={processing}
-                  />
-                </View>
-              )}
-            </View>
-          ) : null}
+            ) : (
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>Remove background</Text>
+                <Switch
+                  value={removeBackground}
+                  onValueChange={setRemoveBackground}
+                  disabled={processing}
+                />
+              </View>
+            )}
+          </View>
 
-          <Text style={styles.sectionLabel}>
-            {mode === 'fit' ? 'Back and sides colour' : 'Fabric colour'}
-          </Text>
+          <Text style={styles.sectionLabel}>Back and sides colour</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -288,9 +268,7 @@ export function AddGarmentModal({
               <ActivityIndicator color={theme.accentText} />
             ) : (
               <Text style={styles.saveText}>
-                {isFull(kind)
-                  ? `Limit of ${MAX_PER_KIND} reached`
-                  : 'Save to library'}
+                {full ? `Limit of ${MAX_PER_KIND} reached` : 'Save to library'}
               </Text>
             )}
           </Pressable>
@@ -336,7 +314,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   controls: {flexGrow: 0, paddingHorizontal: 20, paddingTop: 12},
-  gap: {height: 10},
   fitRow: {
     flexDirection: 'row',
     alignItems: 'center',

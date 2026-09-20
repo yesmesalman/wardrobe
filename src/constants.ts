@@ -1,4 +1,4 @@
-import type {Align, GarmentKind} from './types';
+import type {Align, GarmentKind, Variant} from './types';
 
 /** How many shirts and how many pants the wardrobe holds. */
 export const MAX_PER_KIND = 20;
@@ -25,6 +25,26 @@ export const GARMENT_COLORS = [
   {name: 'Plum', hex: '#6B3B5E'},
   {name: 'Denim', hex: '#4B6584'},
 ] as const;
+
+/** The options offered on each add screen; the first one is the default. */
+export const VARIANTS: Record<GarmentKind, {value: Variant; label: string}[]> =
+  {
+    shirt: [
+      {value: 'short-sleeve', label: 'Short sleeves'},
+      {value: 'long-sleeve', label: 'Long sleeves'},
+    ],
+    pants: [
+      {value: 'long-pants', label: 'Long pants'},
+      {value: 'shorts', label: 'Shorts'},
+    ],
+  };
+
+export const VARIANT_LABELS: Record<Variant, string> = {
+  'short-sleeve': 'Short-sleeve shirt',
+  'long-sleeve': 'Long-sleeve shirt',
+  'long-pants': 'Long pants',
+  shorts: 'Shorts',
+};
 
 export const DEFAULT_COLOR: Record<GarmentKind, string> = {
   shirt: '#F2F0EB',

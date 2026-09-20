@@ -1,7 +1,9 @@
 /**
  * Generates the blank 3D garment models shipped with the app:
- *   src/assets/models/blank_shirt.glb
- *   src/assets/models/blank_pants.glb
+ *   src/assets/models/blank_shirt.glb        short-sleeve shirt
+ *   src/assets/models/blank_shirt_long.glb   long-sleeve shirt
+ *   src/assets/models/blank_pants.glb        long pants
+ *   src/assets/models/blank_shorts.glb       shorts
  *
  * The garments are lofted from smooth cross-sections, so the models are
  * reproducible and dependency free. Run with `npm run generate:models`.
@@ -178,7 +180,8 @@ function ringTube(points, radius, segments = 8) {
 // Shirt
 // ---------------------------------------------------------------------------
 
-function buildShirt() {
+/** Short-sleeve tee, or a long-sleeve shirt with sleeves angled down to the cuff. */
+function buildShirt({long = false} = {}) {
   const mesh = new Mesh();
   const RING = 72;
   const ROWS = 48;
@@ -227,19 +230,20 @@ function buildShirt() {
   mesh.addLoft(ringTube(neck, 0.009), {closedRows: true});
 
   // Short sleeves.
-  const tilt = (38 * Math.PI) / 180;
+  const tilt = ((long ? 46 : 38) * Math.PI) / 180;
   const dir = [Math.cos(tilt), -Math.sin(tilt), 0];
   const up = [Math.sin(tilt), Math.cos(tilt), 0];
-  const SLEEVE_ROWS = 16;
+  const SLEEVE_ROWS = long ? 30 : 16;
   const SLEEVE_RING = 40;
   [1, -1].forEach(side => {
     const root = [side * 0.16, 0.588, 0];
-    const length = 0.27;
+    const length = long ? 0.6 : 0.27;
     const rows = [];
     for (let r = 0; r < SLEEVE_ROWS; r++) {
       const t = r / (SLEEVE_ROWS - 1);
-      const ru = 0.088 - 0.02 * smoothstep(t);
-      const rz = 0.086 - 0.02 * smoothstep(t);
+      // Long sleeves taper to a snug cuff; short ones stay loose.
+      const ru = 0.088 - (long ? 0.04 : 0.02) * smoothstep(t);
+      const rz = 0.086 - (long ? 0.038 : 0.02) * smoothstep(t);
       const c = [
         root[0] + side * dir[0] * length * t,
         root[1] + dir[1] * length * t,
@@ -279,12 +283,14 @@ function buildShirt() {
 // Pants
 // ---------------------------------------------------------------------------
 
-function buildPants() {
+/** Full-length pants, or shorts that stop at the knee. */
+function buildPants({shorts = false} = {}) {
   const mesh = new Mesh();
   const RING = 64;
   const TOP = 1.0;
   const HIP_BOTTOM = 0.5;
   const LEG_TOP = 0.66;
+  const LEG_BOTTOM = shorts ? 0.3 : 0;
 
   // Waist to hip: [y, half width, half depth]. The hip tube tapers inwards at
   // the bottom so it disappears inside the legs, forming the crotch seam.
@@ -325,7 +331,7 @@ function buildPants() {
   [1, -1].forEach(side => {
     const rows = [];
     for (let r = 0; r < LEG_ROWS; r++) {
-      const y = (r / (LEG_ROWS - 1)) * LEG_TOP;
+      const y = LEG_BOTTOM + (r / (LEG_ROWS - 1)) * (LEG_TOP - LEG_BOTTOM);
       const [cx, w, d] = profile(leg, y);
       const ring = [];
       for (let i = 0; i < RING; i++) {
@@ -333,7 +339,9 @@ function buildPants() {
         let [x, z] = superEllipse(theta, w, d, 2.3);
         // Gentle wrinkles that gather towards the ankle.
         const fold =
-          0.005 * Math.sin(10 * theta + 22 * y) * (1 - y / LEG_TOP) ** 1.5;
+          0.005 *
+          Math.sin(10 * theta + 22 * y) *
+          (1 - (y - LEG_BOTTOM) / (LEG_TOP - LEG_BOTTOM)) ** 1.5;
         x += Math.sign(x) * fold;
         z += Math.sign(z) * fold;
         ring.push([side * cx + x, y, z]);
@@ -349,7 +357,7 @@ function buildPants() {
     name: 'Pants',
     // Front of the left thigh.
     decal: {
-      position: [0.115, 0.14, 0.14],
+      position: [0.115, shorts ? -0.01 : 0.14, 0.14],
       rotation: [0, 0, 0],
       scale: [0.17, 0.17, 0.3],
     },
@@ -469,7 +477,9 @@ function toGLB({mesh, name, decal}) {
 fs.mkdirSync(OUT_DIR, {recursive: true});
 [
   ['blank_shirt.glb', buildShirt()],
+  ['blank_shirt_long.glb', buildShirt({long: true})],
   ['blank_pants.glb', buildPants()],
+  ['blank_shorts.glb', buildPants({shorts: true})],
 ].forEach(([file, model]) => {
   const glb = toGLB(model);
   fs.writeFileSync(path.join(OUT_DIR, file), glb);

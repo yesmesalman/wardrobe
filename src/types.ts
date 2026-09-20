@@ -1,9 +1,15 @@
 export type GarmentKind = 'shirt' | 'pants';
 
+/** Which blank 3D model a garment uses. */
+export type ShirtVariant = 'short-sleeve' | 'long-sleeve';
+export type PantsVariant = 'long-pants' | 'shorts';
+export type Variant = ShirtVariant | PantsVariant;
+
 /**
  * How the photo is shown on the blank model:
  *  - fit:   the garment cut out of the photo covers the whole model
- *  - print: the photo is a small decal on the chest / thigh
+ *  - print: the photo is a small decal on the chest / thigh (only garments
+ *           saved by early versions use this; new ones are always "fit")
  */
 export type PhotoMode = 'fit' | 'print';
 
@@ -21,6 +27,7 @@ export interface Align {
 export interface Garment {
   id: string;
   kind: GarmentKind;
+  variant: Variant;
   mode: PhotoMode;
   /** File name of the user's photo inside the app's garments directory. */
   photoFile: string;

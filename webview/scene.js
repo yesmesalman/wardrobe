@@ -10,7 +10,8 @@
  *   - "print": the photo is a small decal on the chest / thigh
  *
  * React Native drives it through these globals:
- *   __setGarment({kind, photo, mode, align})  swap model / photo / mode
+ *   __setGarment({variant, photo, mode, align})  swap model / photo / mode
+ *       variant: 'short-sleeve' | 'long-sleeve' | 'long-pants' | 'shorts'
  *   __setColor(hex)                           fabric colour
  *   __setAutoRotate(bool)
  *   __setView('3d' | 'align')                 3D view or 2D alignment view
@@ -25,7 +26,17 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {DecalGeometry} from 'three/examples/jsm/geometries/DecalGeometry.js';
 import shirtModel from '../src/assets/models/blank_shirt.glb';
+import longShirtModel from '../src/assets/models/blank_shirt_long.glb';
 import pantsModel from '../src/assets/models/blank_pants.glb';
+import shortsModel from '../src/assets/models/blank_shorts.glb';
+
+// Blank models by variant (base64, embedded by the bundler).
+const MODEL_DATA = {
+  'short-sleeve': shirtModel,
+  'long-sleeve': longShirtModel,
+  'long-pants': pantsModel,
+  shorts: shortsModel,
+};
 
 const BACKGROUND = 0xece7df;
 const FOV = 30;
@@ -96,9 +107,9 @@ scene.add(alignPlane);
 // ---------------------------------------------------------------------------
 
 const loader = new GLTFLoader();
-const models = {}; // kind -> {geometry, anchor, size, bbox}
+const models = {}; // variant -> {geometry, anchor, size, bbox}
 const state = {
-  kind: null,
+  variant: null,
   mode: 'fit',
   color: '#f2f0eb',
   autoRotate: true,
@@ -112,11 +123,11 @@ const state = {
 let garment = null; // {group, material, uniforms, texture, model}
 let size = {width: 1, height: 1};
 
-function loadModel(kind) {
-  if (models[kind]) {
-    return Promise.resolve(models[kind]);
+function loadModel(variant) {
+  if (models[variant]) {
+    return Promise.resolve(models[variant]);
   }
-  const base64 = kind === 'pants' ? pantsModel : shirtModel;
+  const base64 = MODEL_DATA[variant] || MODEL_DATA['short-sleeve'];
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   return new Promise((resolve, reject) =>
     loader.parse(
@@ -131,7 +142,7 @@ function loadModel(kind) {
         const box = mesh.geometry.boundingBox;
         const dims = box.getSize(new THREE.Vector3());
         const centre = box.getCenter(new THREE.Vector3());
-        models[kind] = {
+        models[variant] = {
           geometry: mesh.geometry,
           anchor: mesh.userData.decal,
           // Yaw changes the visible width, so frame the wider horizontal side.
@@ -139,7 +150,7 @@ function loadModel(kind) {
           // Front-on extent, used to fit a photo over the model.
           bbox: {cx: centre.x, cy: centre.y, W: dims.x, H: dims.y},
         };
-        resolve(models[kind]);
+        resolve(models[variant]);
       },
       reject,
     ),
@@ -236,10 +247,10 @@ function disposeGarment() {
   garment = null;
 }
 
-async function setGarment({kind, photo, mode, align}) {
+async function setGarment({variant, photo, mode, align}) {
   const request = ++state.request;
   try {
-    const model = await loadModel(kind);
+    const model = await loadModel(variant);
     const texture = photo ? await loadTexture(photo) : null;
     if (request !== state.request) {
       texture && texture.dispose();
@@ -301,7 +312,7 @@ async function setGarment({kind, photo, mode, align}) {
       model,
     };
     size = model.size;
-    state.kind = kind;
+    state.variant = variant;
     state.mode = mode;
     state.align = {...DEFAULT_ALIGN, ...align};
     if (!uniforms) {

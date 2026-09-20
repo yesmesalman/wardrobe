@@ -6,6 +6,7 @@ import React from 'react';
 import {Text} from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
+import {SettingsScreen} from '../src/screens/SettingsScreen';
 
 jest.mock('react-native-safe-area-context', () =>
   require('react-native-safe-area-context/jest/mock').default,
@@ -23,23 +24,68 @@ jest.mock('../src/storage/wardrobeStorage', () => ({
 jest.mock('../src/hooks/pickPhoto', () => ({pickPhoto: jest.fn()}));
 
 // A cold Babel cache transpiles the whole app tree, which can exceed 5 seconds.
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 
-test('renders an empty library', async () => {
+const screenText = (renderer: ReactTestRenderer.ReactTestRenderer) =>
+  renderer.root
+    .findAllByType(Text)
+    .map(node => [node.props.children].flat().join(''))
+    .join('|');
+
+const settle = async () => {
+  await ReactTestRenderer.act(async () => {
+    jest.runOnlyPendingTimers();
+  });
+};
+
+async function openTab(
+  renderer: ReactTestRenderer.ReactTestRenderer,
+  name: string,
+) {
+  const tab = renderer.root.find(
+    node =>
+      typeof node.props.accessibilityLabel === 'string' &&
+      node.props.accessibilityLabel.startsWith(`${name},`) &&
+      typeof node.props.onPress === 'function',
+  );
+  await ReactTestRenderer.act(async () => {
+    tab.props.onPress({});
+  });
+  await settle();
+}
+
+test('has Outfit, Library and Settings tabs, with Add item on Outfit and Library', async () => {
   jest.useFakeTimers();
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
     renderer = ReactTestRenderer.create(<App />);
   });
-  await ReactTestRenderer.act(async () => {
-    jest.runOnlyPendingTimers();
-  });
-  const text = renderer.root
-    .findAllByType(Text)
-    .map(node => [node.props.children].flat().join(''))
-    .join('|');
-  jest.useRealTimers();
+  await settle();
+
+  // Library is the starting tab.
+  let text = screenText(renderer);
+  expect(text).toContain('Outfit');
+  expect(text).toContain('Library');
+  expect(text).toContain('Settings');
   expect(text).toContain('Shirts 0/20');
   expect(text).toContain('Pants 0/20');
   expect(text).toContain('No shirts yet');
+  expect(text).toContain('Add item');
+
+  await openTab(renderer, 'Outfit');
+  text = screenText(renderer);
+  expect(text).toContain('Mix and match your wardrobe');
+  expect(text).toContain('Add item');
+
+  jest.useRealTimers();
+});
+
+test('Settings is empty and has no Add item button', async () => {
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<SettingsScreen />);
+  });
+  const text = screenText(renderer);
+  expect(text).toContain('Settings');
+  expect(text).not.toContain('Add item');
 });

@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {Alert, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {KIND_LABELS, theme} from '../constants';
+import {theme, VARIANT_LABELS} from '../constants';
 import {readFileBase64} from '../storage/wardrobeStorage';
 import type {Garment} from '../types';
 import {GarmentView, Photo} from './GarmentView';
@@ -41,7 +41,7 @@ export function GarmentViewerModal({garment, onClose, onDelete}: Props) {
       return;
     }
     Alert.alert(
-      `Delete this ${KIND_LABELS[garment.kind].singular.toLowerCase()}?`,
+      `Delete this ${VARIANT_LABELS[garment.variant].toLowerCase()}?`,
       'It will be removed from your library.',
       [
         {text: 'Cancel', style: 'cancel'},
@@ -69,7 +69,7 @@ export function GarmentViewerModal({garment, onClose, onDelete}: Props) {
             <Text style={styles.action}>Done</Text>
           </Pressable>
           <Text style={styles.title}>
-            {garment ? KIND_LABELS[garment.kind].singular : ''}
+            {garment ? VARIANT_LABELS[garment.variant] : ''}
           </Text>
           <Pressable onPress={confirmDelete} hitSlop={12}>
             <Text style={[styles.action, styles.danger]}>Delete</Text>
@@ -78,7 +78,7 @@ export function GarmentViewerModal({garment, onClose, onDelete}: Props) {
         {garment ? (
           <GarmentView
             key={garment.id}
-            kind={garment.kind}
+            variant={garment.variant}
             color={garment.color}
             photo={photo}
             mode={garment.mode}

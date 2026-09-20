@@ -29,9 +29,10 @@ export async function loadGarments(): Promise<Garment[]> {
     if (!Array.isArray(parsed)) {
       return [];
     }
-    // Garments saved before "fit" mode existed only have a printed photo.
+    // Older garments: print mode came first, then variants were added.
     return parsed.map(g => ({
       ...g,
+      variant: g.variant ?? (g.kind === 'pants' ? 'long-pants' : 'short-sleeve'),
       mode: g.mode ?? 'print',
       align: g.align ?? DEFAULT_ALIGN,
     }));

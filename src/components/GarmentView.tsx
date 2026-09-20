@@ -9,7 +9,7 @@ import React, {
 import {ActivityIndicator, StyleSheet, View, ViewStyle} from 'react-native';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
 import {DEFAULT_ALIGN, theme} from '../constants';
-import type {Align, GarmentKind, PhotoMode} from '../types';
+import type {Align, PhotoMode, Variant} from '../types';
 import {SCENE_HTML} from '../webview/sceneHtml';
 
 export interface Photo {
@@ -36,7 +36,7 @@ export interface GarmentViewHandle {
 }
 
 interface Props {
-  kind: GarmentKind;
+  variant: Variant;
   color: string;
   /** Fit mode: the cut-out (PNG). Print mode: the photo (JPEG). */
   photo?: Photo | null;
@@ -70,7 +70,7 @@ const stripDataUrl = (dataUrl: string) => dataUrl.replace(/^data:[^,]*,/, '');
 export const GarmentView = forwardRef<GarmentViewHandle, Props>(
   function GarmentViewImpl(
     {
-      kind,
+      variant,
       color,
       photo,
       mode = 'print',
@@ -103,14 +103,14 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
         setLoaded(false);
         run(
           `window.__setGarment(${JSON.stringify({
-            kind,
+            variant,
             photo: photoUri,
             mode,
             align: initialAlign.current,
           })})`,
         );
       }
-    }, [ready, kind, photoUri, mode, run]);
+    }, [ready, variant, photoUri, mode, run]);
 
     useEffect(() => {
       if (ready) {

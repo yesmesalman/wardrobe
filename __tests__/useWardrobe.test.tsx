@@ -40,6 +40,7 @@ const addMany = async (
     await ReactTestRenderer.act(async () => {
       await wardrobe.current.add({
         kind,
+        variant: kind === 'shirt' ? ('short-sleeve' as const) : ('long-pants' as const),
         mode: 'print' as const,
         color: '#fff',
         align: {sx: 1, sy: 1, ox: 0, oy: 0},
@@ -61,6 +62,7 @@ test('keeps at most 20 shirts and 20 pants, independently', async () => {
   await expect(
     wardrobe.current.add({
       kind: 'shirt',
+      variant: 'short-sleeve',
       mode: 'print',
       color: '#fff',
       align: {sx: 1, sy: 1, ox: 0, oy: 0},

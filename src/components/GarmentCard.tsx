@@ -1,6 +1,6 @@
 import React from 'react';
 import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
-import {KIND_LABELS, theme} from '../constants';
+import {theme, VARIANT_LABELS} from '../constants';
 import {fileUri} from '../storage/wardrobeStorage';
 import type {Garment} from '../types';
 
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function GarmentCard({garment, onPress}: Props) {
-  const label = KIND_LABELS[garment.kind].singular;
+  const label = VARIANT_LABELS[garment.variant];
   const added = new Date(garment.createdAt).toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
