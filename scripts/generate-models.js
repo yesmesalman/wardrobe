@@ -286,25 +286,27 @@ function buildShirt({long = false} = {}) {
 /**
  * Full-length pants, or shorts that stop at the knee.
  *
- * The waist is at y = 1. The legs overlap at the top so they close the gap
- * between them (no bulging pouch at the crotch) and only separate below the
- * fork, at about y = 0.44. Long pants reach well below y = 0, so the inseam
- * (fork to hem, about 0.58) and the hem are long.
+ * Proportions follow a flat-lay of slim jeans: the waist is at y = 1 and the
+ * crotch point (fork) is high, at y = FORK. Above it the legs overlap and
+ * merge into the hips; below it they part in a narrow V that widens steadily
+ * to a slim hem. Long pants hang to y = -0.14, so the inseam (FORK to hem,
+ * 0.8) is about 70% of the whole length, as on real jeans.
  */
 function buildPants({shorts = false} = {}) {
   const mesh = new Mesh();
   const RING = 64;
   const TOP = 1.0;
-  const HIP_BOTTOM = 0.58;
+  const FORK = 0.66;
+  const HIP_BOTTOM = 0.62;
   const LEG_TOP = 0.76;
   const LEG_BOTTOM = shorts ? 0.3 : -0.14;
 
   // Waist to hip: [y, half width, half depth]. The bottom of the hip tube is
   // no deeper than the two legs joined together, so it disappears inside them.
   const hips = [
-    [HIP_BOTTOM, 0.2, 0.088],
-    [0.68, 0.226, 0.122],
-    [0.76, 0.226, 0.126],
+    [HIP_BOTTOM, 0.21, 0.102],
+    [0.68, 0.228, 0.124],
+    [0.76, 0.228, 0.126],
     [0.86, 0.208, 0.114],
     [0.94, 0.194, 0.106],
     [TOP, 0.194, 0.106],
@@ -325,17 +327,31 @@ function buildPants({shorts = false} = {}) {
   }
   mesh.addLoft(hipRows);
 
-  // Legs: [y, centre x, half width, half depth]. Above the fork the two legs
-  // overlap at the centre; below it they part and taper to the hem.
+  // Legs: [y, centre x, half width, half depth]. Each leg's inner edge
+  // (centre - half width) runs in a straight line from the hem up to the
+  // fork, where the legs meet; the outer edge tapers in towards the hem.
+  const jeansLeg = [
+    [-0.14, 0.121, 0.051, 0.056],
+    [0.0, 0.119, 0.0614, 0.062],
+    [0.2, 0.1173, 0.0773, 0.074],
+    [0.4, 0.1152, 0.0924, 0.092],
+    [0.5, 0.1149, 0.1009, 0.106],
+    [0.6, 0.1125, 0.1075, 0.118],
+  ];
+  // Shorts have a roomier, straighter leg than the slim jeans: the inner edge
+  // still runs straight to the fork, but the outer edge stays put.
+  const shortsLeg = [
+    [0.3, 0.13, 0.092, 0.1],
+    [0.4, 0.125, 0.0975, 0.108],
+    [0.5, 0.1197, 0.1028, 0.114],
+    [0.6, 0.1144, 0.1081, 0.12],
+  ];
   const leg = [
-    [-0.14, 0.108, 0.084, 0.086],
-    [-0.02, 0.109, 0.088, 0.09],
-    [0.14, 0.11, 0.094, 0.098],
-    [0.3, 0.111, 0.1, 0.106],
-    [0.44, 0.111, 0.11, 0.116],
-    [0.54, 0.104, 0.12, 0.122],
-    [0.66, 0.1, 0.122, 0.122],
-    [LEG_TOP, 0.1, 0.12, 0.118],
+    ...(shorts ? shortsLeg : jeansLeg),
+    [FORK, 0.112, 0.112, 0.123],
+    // Above the fork the legs overlap and merge into the hips.
+    [0.7, 0.105, 0.115, 0.122],
+    [LEG_TOP, 0.1, 0.118, 0.118],
   ];
   const LEG_ROWS = 48;
   [1, -1].forEach(side => {
