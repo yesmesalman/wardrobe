@@ -13,6 +13,8 @@
  *   __setGarment({variant, photo, mode, align})  swap model / photo / mode
  *       variant: 'short-sleeve' | 'long-sleeve' | 'long-pants' | 'shorts'
  *   __setColor(hex)                           fabric colour
+ *   __setOutfit({shirt, pants})               show a shirt over pants, as if worn
+ *       each: null or {variant, photo, mode, color, align}
  *   __setAutoRotate(bool)
  *   __setView('3d' | 'align')                 3D view or 2D alignment view
  *   __setAlign({sx, sy, ox, oy}), __resetAlign()
@@ -110,6 +112,7 @@ const loader = new GLTFLoader();
 const models = {}; // variant -> {geometry, anchor, size, bbox}
 const state = {
   variant: null,
+  outfit: false,
   mode: 'fit',
   color: '#f2f0eb',
   autoRotate: true,
@@ -121,7 +124,21 @@ const state = {
   request: 0,
 };
 let garment = null; // {group, material, uniforms, texture, model}
+let outfit = []; // garments shown together by __setOutfit
 let size = {width: 1, height: 1};
+
+// Outfit layout: the waist is y = 0, the shirt's hem overlaps the pants' top.
+// The frame is fixed (long sleeves, long pants) so swapping garments never
+// rescales the figure.
+const OUTFIT = {
+  overlap: 0.09,
+  shirtHeight: 0.74,
+  pantsHeight: 1.02,
+  width: 1.3,
+  // The pants are a little deeper than the shirt's hem; flatten them slightly
+  // so the waistband stays tucked under the shirt.
+  pantsDepth: 0.72,
+};
 
 function loadModel(variant) {
   if (models[variant]) {
@@ -229,13 +246,10 @@ function makeFitMaterial(color, texture, bbox) {
   return {material, uniforms};
 }
 
-function disposeGarment() {
-  if (!garment) {
-    return;
-  }
-  spinner.remove(garment.group);
-  garment.group.traverse(o => {
-    if (o.isMesh && o.geometry !== garment.model.geometry) {
+function disposeOf(g) {
+  g.group.parent && g.group.parent.remove(g.group);
+  g.group.traverse(o => {
+    if (o.isMesh && o.geometry !== g.model.geometry) {
       o.geometry.dispose();
     }
     if (o.material) {
@@ -243,8 +257,67 @@ function disposeGarment() {
       o.material.dispose();
     }
   });
-  garment.texture && garment.texture.dispose();
-  garment = null;
+  g.texture && g.texture.dispose();
+}
+
+function disposeGarment() {
+  if (garment) {
+    disposeOf(garment);
+    garment = null;
+  }
+}
+
+function disposeOutfit() {
+  outfit.forEach(disposeOf);
+  outfit = [];
+}
+
+/** Builds a garment (not yet added to the scene) from a model and a photo. */
+function createGarment(model, texture, mode, color, align) {
+  const fit = mode === 'fit' && texture;
+  const group = new THREE.Group();
+  let material;
+  let uniforms = null;
+  if (fit) {
+    ({material, uniforms} = makeFitMaterial(color, texture, model.bbox));
+    if (align) {
+      uniforms.uAlign.value.set(align.sx, align.sy, align.ox, align.oy);
+    }
+  } else {
+    material = new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.85,
+      side: THREE.DoubleSide,
+    });
+  }
+  const mesh = new THREE.Mesh(model.geometry, material);
+  group.add(mesh);
+
+  if (texture && !fit) {
+    // Print mode: project the photo onto the garment's print area, keeping
+    // its aspect ratio inside the anchor's square footprint.
+    const {position, rotation, scale} = model.anchor;
+    const aspect = texture.image.width / texture.image.height;
+    const ratio = aspect >= 1 ? [1, 1 / aspect] : [aspect, 1];
+    group.add(
+      new THREE.Mesh(
+        new DecalGeometry(
+          mesh,
+          new THREE.Vector3(...position),
+          new THREE.Euler(...rotation),
+          new THREE.Vector3(scale[0] * ratio[0], scale[1] * ratio[1], scale[2]),
+        ),
+        new THREE.MeshStandardMaterial({
+          map: texture,
+          transparent: true,
+          roughness: 0.6,
+          polygonOffset: true,
+          polygonOffsetFactor: -4,
+        }),
+      ),
+    );
+  }
+  return {group, material, uniforms, texture: fit ? texture : null, model};
 }
 
 async function setGarment({variant, photo, mode, align}) {
@@ -257,70 +330,80 @@ async function setGarment({variant, photo, mode, align}) {
       return;
     }
     disposeGarment();
+    disposeOutfit();
+    state.outfit = false;
 
-    const fit = mode === 'fit' && texture;
-    const group = new THREE.Group();
-    let material;
-    let uniforms = null;
-    if (fit) {
-      ({material, uniforms} = makeFitMaterial(
-        state.color,
-        texture,
-        model.bbox,
-      ));
-    } else {
-      material = new THREE.MeshStandardMaterial({
-        color: state.color,
-        roughness: 0.85,
-        side: THREE.DoubleSide,
-      });
-    }
-    const mesh = new THREE.Mesh(model.geometry, material);
-    group.add(mesh);
-
-    if (texture && !fit) {
-      // Print mode: project the photo onto the garment's print area, keeping
-      // its aspect ratio inside the anchor's square footprint.
-      const {position, rotation, scale} = model.anchor;
-      const aspect = texture.image.width / texture.image.height;
-      const ratio = aspect >= 1 ? [1, 1 / aspect] : [aspect, 1];
-      group.add(
-        new THREE.Mesh(
-          new DecalGeometry(
-            mesh,
-            new THREE.Vector3(...position),
-            new THREE.Euler(...rotation),
-            new THREE.Vector3(scale[0] * ratio[0], scale[1] * ratio[1], scale[2]),
-          ),
-          new THREE.MeshStandardMaterial({
-            map: texture,
-            transparent: true,
-            roughness: 0.6,
-            polygonOffset: true,
-            polygonOffsetFactor: -4,
-          }),
-        ),
-      );
-    }
-
-    spinner.add(group);
-    garment = {
-      group,
-      material,
-      uniforms,
-      texture: fit ? texture : null,
-      model,
-    };
+    garment = createGarment(model, texture, mode, state.color);
+    spinner.add(garment.group);
     size = model.size;
     state.variant = variant;
     state.mode = mode;
     state.align = {...DEFAULT_ALIGN, ...align};
-    if (!uniforms) {
+    if (!garment.uniforms) {
       state.view = '3d';
     }
     fitCamera();
     applyAlign();
     applyView();
+    post({type: 'loaded'});
+  } catch (e) {
+    post({type: 'error', message: String(e && e.message ? e.message : e)});
+  }
+}
+
+/** Shows a shirt over pants at their natural positions, as if worn. */
+async function setOutfit({shirt, pants}) {
+  const request = ++state.request;
+  try {
+    const parts = await Promise.all(
+      [
+        ['shirt', shirt],
+        ['pants', pants],
+      ].map(async ([part, spec]) =>
+        spec
+          ? {
+              part,
+              spec,
+              model: await loadModel(spec.variant),
+              texture: spec.photo ? await loadTexture(spec.photo) : null,
+            }
+          : null,
+      ),
+    );
+    if (request !== state.request) {
+      parts.forEach(p => p && p.texture && p.texture.dispose());
+      return;
+    }
+    disposeGarment();
+    disposeOutfit();
+    state.outfit = true;
+    state.view = '3d';
+    alignPlane.visible = false;
+
+    parts.forEach(p => {
+      if (!p) {
+        return;
+      }
+      const g = createGarment(
+        p.model,
+        p.texture,
+        p.spec.mode,
+        p.spec.color,
+        p.spec.align,
+      );
+      const height = p.model.size.height;
+      // Models are centred on their own bounding box; hang them from the waist.
+      g.group.position.y =
+        p.part === 'shirt'
+          ? -OUTFIT.overlap + height / 2
+          : -height / 2;
+      if (p.part === 'pants') {
+        g.group.scale.z = OUTFIT.pantsDepth;
+      }
+      spinner.add(g.group);
+      outfit.push(g);
+    });
+    fitCamera();
     post({type: 'loaded'});
   } catch (e) {
     post({type: 'error', message: String(e && e.message ? e.message : e)});
@@ -407,6 +490,23 @@ function scaleAlign(factor) {
 /** Backs the perspective camera off until the whole garment fits. */
 function fitCamera() {
   const half = Math.tan((FOV * Math.PI) / 360);
+  if (state.outfit) {
+    const top = -OUTFIT.overlap + OUTFIT.shirtHeight;
+    const bottom = -OUTFIT.pantsHeight;
+    const centre = (top + bottom) / 2;
+    const distance = Math.max(
+      (top - bottom) / (2 * half),
+      OUTFIT.width / (2 * half * camera.aspect),
+    );
+    camera.position.set(0, centre, distance * 1.06);
+    camera.lookAt(0, centre, 0);
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld();
+    // Where the waist falls on screen, so the app can split touch zones there.
+    const waist = new THREE.Vector3(0, 0, 0).project(camera);
+    post({type: 'outfitLayout', split: (1 - waist.y) / 2});
+    return;
+  }
   const distance = Math.max(
     size.height / (2 * half),
     size.width / (2 * half * camera.aspect),
@@ -433,10 +533,10 @@ function frame(now) {
   const delta = Math.min((now - last) / 1000, 0.1);
   last = now;
   const aligning = state.view === 'align' && garment && garment.uniforms;
-  if (!aligning && state.autoRotate && !state.dragging) {
+  if (!aligning && !state.outfit && state.autoRotate && !state.dragging) {
     state.yaw += delta * SPIN_SPEED;
   }
-  spinner.rotation.y = aligning ? 0 : state.yaw;
+  spinner.rotation.y = aligning || state.outfit ? 0 : state.yaw;
   renderer.render(scene, aligning ? alignCamera : camera);
   requestAnimationFrame(frame);
 }
@@ -838,6 +938,7 @@ function snapshot(id) {
 }
 
 window.__setGarment = setGarment;
+window.__setOutfit = setOutfit;
 window.__setColor = setColor;
 window.__setAutoRotate = value => {
   state.autoRotate = value;

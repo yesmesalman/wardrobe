@@ -13,6 +13,7 @@ jest.mock('react-native-safe-area-context', () =>
 );
 // The WebView, the file system and the pickers need a native runtime.
 jest.mock('../src/components/GarmentView', () => ({GarmentView: () => null}));
+jest.mock('../src/components/OutfitScene', () => ({OutfitScene: () => null}));
 jest.mock('../src/storage/wardrobeStorage', () => ({
   loadGarments: jest.fn(() => Promise.resolve([])),
   saveGarments: jest.fn(() => Promise.resolve()),
