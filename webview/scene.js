@@ -40,7 +40,8 @@ const MODEL_DATA = {
   shorts: shortsModel,
 };
 
-const BACKGROUND = 0xece7df;
+// The app can match its own screen colour by setting window.__BACKGROUND first.
+const BACKGROUND = window.__BACKGROUND || '#ece7df';
 const FOV = 30;
 const SPIN_SPEED = 0.6; // radians per second
 const DRAG_SPEED = 0.012; // radians per pixel
@@ -72,6 +73,8 @@ const canvas = renderer.domElement;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(BACKGROUND);
+document.documentElement.style.background = BACKGROUND;
+document.body.style.background = BACKGROUND;
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8378, 1.1));
 const key = new THREE.DirectionalLight(0xffffff, 1.9);
 key.position.set(2, 3, 4);
@@ -129,13 +132,16 @@ const transitions = []; // garments sliding in or out of the outfit
 let size = {width: 1, height: 1};
 
 // Outfit layout: the waist is y = 0, the shirt's hem overlaps the pants' top.
-// The frame is fixed (long sleeves, long pants) so swapping garments never
-// rescales the figure.
+const outfitCam = {distance: 4, centre: 0, tDistance: 4, tCentre: 0, snap: true};
 const OUTFIT = {
   overlap: 0.09,
   shirtHeight: 0.74,
   pantsHeight: 1.02,
-  width: 1.3,
+  // Framing: the figure fills the height (with this much air) unless a wide
+  // long-sleeve shirt needs the width; the camera glides when that changes.
+  heightMargin: 1.16,
+  widthMargin: 1.06,
+  defaultWidth: 0.9,
   // The pants are a little deeper than the shirt's hem; flatten them slightly
   // so the waistband stays tucked under the shirt.
   pantsDepth: 0.72,
@@ -426,6 +432,9 @@ async function setOutfit(specs) {
     }
     disposeGarment();
     finishTransitions();
+    if (!state.outfit) {
+      outfitCam.snap = true;
+    }
     state.outfit = true;
     state.view = '3d';
     alignPlane.visible = false;
@@ -554,23 +563,35 @@ function scaleAlign(factor) {
 // ---------------------------------------------------------------------------
 
 /** Backs the perspective camera off until the whole garment fits. */
+function placeOutfitCamera() {
+  camera.position.set(0, outfitCam.centre, outfitCam.distance);
+  camera.lookAt(0, outfitCam.centre, 0);
+  camera.updateProjectionMatrix();
+}
+
 function fitCamera() {
   const half = Math.tan((FOV * Math.PI) / 360);
   if (state.outfit) {
     const top = -OUTFIT.overlap + OUTFIT.shirtHeight;
     const bottom = -OUTFIT.pantsHeight;
-    const centre = (top + bottom) / 2;
-    const distance = Math.max(
-      (top - bottom) / (2 * half),
-      OUTFIT.width / (2 * half * camera.aspect),
+    const width = outfit.shirt
+      ? outfit.shirt.model.size.width
+      : OUTFIT.defaultWidth;
+    outfitCam.tCentre = (top + bottom) / 2;
+    outfitCam.tDistance = Math.max(
+      ((top - bottom) * OUTFIT.heightMargin) / (2 * half),
+      (width * OUTFIT.widthMargin) / (2 * half * camera.aspect),
     );
-    camera.position.set(0, centre, distance * 1.06);
-    camera.lookAt(0, centre, 0);
-    camera.updateProjectionMatrix();
-    camera.updateMatrixWorld();
-    // Where the waist falls on screen, so the app can split touch zones there.
-    const waist = new THREE.Vector3(0, 0, 0).project(camera);
-    post({type: 'outfitLayout', split: (1 - waist.y) / 2});
+    if (outfitCam.snap) {
+      outfitCam.distance = outfitCam.tDistance;
+      outfitCam.centre = outfitCam.tCentre;
+      outfitCam.snap = false;
+    }
+    placeOutfitCamera();
+    // Where the waist (y = 0) falls on screen once the camera has settled, so
+    // the app can split its touch zones there.
+    const ndc = -outfitCam.tCentre / (outfitCam.tDistance * half);
+    post({type: 'outfitLayout', split: (1 - ndc) / 2});
     return;
   }
   const distance = Math.max(
@@ -588,6 +609,7 @@ function resize() {
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(width, height);
   camera.aspect = width / height;
+  outfitCam.snap = true;
   fitCamera();
   fitAlignCamera();
 }
@@ -604,6 +626,12 @@ function frame(now) {
   }
   spinner.rotation.y = aligning || state.outfit ? 0 : state.yaw;
   stepTransitions(now);
+  if (state.outfit) {
+    const k = 1 - Math.exp(-delta * 9);
+    outfitCam.distance += (outfitCam.tDistance - outfitCam.distance) * k;
+    outfitCam.centre += (outfitCam.tCentre - outfitCam.centre) * k;
+    placeOutfitCamera();
+  }
   renderer.render(scene, aligning ? alignCamera : camera);
   requestAnimationFrame(frame);
 }

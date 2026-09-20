@@ -144,6 +144,8 @@ export function OutfitScene({
         source={{html: SCENE_HTML}}
         originWhitelist={['*']}
         onMessage={onMessage}
+        // Draw the scene in the screen's own colour, so it has no visible edge.
+        injectedJavaScriptBeforeContentLoaded={`window.__BACKGROUND='${theme.background}';true;`}
         // A (re)loaded page starts empty and announces itself again.
         onLoadStart={() => {
           setReady(false);
@@ -169,12 +171,12 @@ export function OutfitScene({
 }
 
 const styles = StyleSheet.create({
-  container: {backgroundColor: theme.sceneBottom, overflow: 'hidden'},
-  web: {flex: 1, backgroundColor: theme.sceneBottom},
+  container: {backgroundColor: theme.background, overflow: 'hidden'},
+  web: {flex: 1, backgroundColor: theme.background},
   loader: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.sceneBottom,
+    backgroundColor: theme.background,
   },
 });

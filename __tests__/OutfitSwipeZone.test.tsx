@@ -91,6 +91,21 @@ describe('OutfitSwipeZone', () => {
     expect(onOpen).toHaveBeenCalled();
   });
 
+  test('shows no placeholder while the wardrobe is still loading', async () => {
+    const renderer = await render(
+      <OutfitSwipeZone
+        kind="pants"
+        loaded={false}
+        count={0}
+        index={0}
+        onIndexChange={jest.fn()}
+        onOpen={jest.fn()}
+        onAdd={jest.fn()}
+      />,
+    );
+    expect(text(renderer)).toBe('');
+  });
+
   test('shows a placeholder that starts the add flow when there are none', async () => {
     const onAdd = jest.fn();
     const renderer = await render(

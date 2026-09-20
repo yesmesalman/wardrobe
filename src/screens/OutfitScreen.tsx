@@ -20,7 +20,7 @@ const DEFAULT_SPLIT = 0.5;
 export function OutfitScreen() {
   const insets = useSafeAreaInsets();
   const {
-    wardrobe: {garments, remove},
+    wardrobe: {garments, loaded, remove},
     startAdd,
   } = useWardrobeContext();
   const [viewing, setViewing] = useState<Garment | null>(null);
@@ -72,6 +72,7 @@ export function OutfitScreen() {
         />
         <OutfitSwipeZone
           kind="shirt"
+          loaded={loaded}
           count={shirts.length}
           index={shirtAt}
           onIndexChange={changeShirt}
@@ -81,6 +82,7 @@ export function OutfitScreen() {
         />
         <OutfitSwipeZone
           kind="pants"
+          loaded={loaded}
           count={pants.length}
           index={pantsAt}
           onIndexChange={changePants}
@@ -102,14 +104,6 @@ const styles = StyleSheet.create({
   top: {top: 0},
   bottom: {bottom: 0},
   root: {flex: 1, backgroundColor: theme.background},
-  panel: {
-    flex: 1,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-    backgroundColor: theme.sceneBottom,
-    overflow: 'hidden',
-  },
+  // No card or border: the scene blends into the screen.
+  panel: {flex: 1, overflow: 'hidden'},
 });
