@@ -11,7 +11,7 @@ import {AddItemSheet} from '../components/AddItemSheet';
 import {AddPantsModal} from '../components/AddPantsModal';
 import {AddShirtModal} from '../components/AddShirtModal';
 import type {GarmentDraft} from '../components/AddGarmentModal';
-import {KIND_LABELS} from '../constants';
+import {KIND_LABELS, MAX_PER_KIND} from '../constants';
 import {PhotoSource, pickPhoto} from '../hooks/pickPhoto';
 import {useWardrobe} from '../hooks/useWardrobe';
 import type {GarmentKind} from '../types';
@@ -23,8 +23,11 @@ interface WardrobeContextValue {
   /** Which Library tab is showing. */
   libraryTab: GarmentKind;
   setLibraryTab: (kind: GarmentKind) => void;
-  /** Starts the add flow: choose shirt/pants, pick a photo, add the item. */
-  startAdd: () => void;
+  /**
+   * Starts the add flow: choose shirt/pants, pick a photo, add the item.
+   * Pass a kind to skip the shirt/pants chooser.
+   */
+  startAdd: (kind?: GarmentKind) => void;
 }
 
 const WardrobeContext = createContext<WardrobeContextValue | null>(null);
@@ -103,13 +106,23 @@ export function WardrobeProvider({children}: {children: ReactNode}) {
     setLibraryTab(result.kind);
   };
 
+  const startAdd = (kind?: GarmentKind) => {
+    if (!kind) {
+      setChooserOpen(true);
+    } else if (wardrobe.isFull(kind)) {
+      Alert.alert(
+        'Library is full',
+        `You can keep up to ${MAX_PER_KIND} ${KIND_LABELS[kind].plural.toLowerCase()}.`,
+      );
+    } else {
+      chooseSource(kind);
+    }
+  };
+
   const value = useMemo(
-    () => ({
-      wardrobe,
-      libraryTab,
-      setLibraryTab,
-      startAdd: () => setChooserOpen(true),
-    }),
+    () => ({wardrobe, libraryTab, setLibraryTab, startAdd}),
+    // startAdd only reads the latest wardrobe, which is already a dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [wardrobe, libraryTab],
   );
 

@@ -76,7 +76,10 @@ test('has Outfit, Library and Settings tabs, with Add item on Outfit and Library
 
   await openTab(renderer, 'Outfit');
   text = screenText(renderer);
-  expect(text).toContain('Mix and match your wardrobe');
+  expect(text).toContain('Swipe to mix and match');
+  // Nothing in the Library yet, so both rows are placeholders.
+  expect(text).toContain('Add a shirt');
+  expect(text).toContain('Add pants');
   expect(text).toContain('Add item');
 
   jest.useRealTimers();

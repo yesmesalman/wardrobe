@@ -22,7 +22,8 @@ React Native mobile app for wardrobe management using the latest React Native (0
 - `react-native-image-picker` (camera/gallery) and `@dr.pogodin/react-native-fs` (storage)
 
 ### App structure
-- Bottom tabs, in order: **Library** (opens first), **Outfit** (placeholder, centre), **Settings** (placeholder).
+- Bottom tabs, in order: **Library** (opens first), **Outfit** (centre), **Settings** (placeholder).
+- **Outfit** shows the first shirt and the first pants from the Library, one above the other. Each row swipes sideways through the other garments of that kind (`OutfitRow`, still snapshots, stops at the ends, dots show the position). Tapping opens the 3D viewer; a dashed placeholder starts the add flow when a kind has none. The choice is not remembered between launches.
 - The **Add item** button sits at the top right of the Outfit and Library headers (`ScreenHeader`), not on Settings.
 - Library shows garments as a 4-column grid of bordered image-only cards. It opens a Shirt/Pants chooser, then the camera/gallery picker, then a shirt screen (short or long sleeves) or a pants screen (long pants or shorts). The add flow and the wardrobe state live in `src/state/WardrobeContext.tsx`.
 - Each garment has a `kind` (shirt/pants, used for the 20-item limits and Library tabs) and a `variant` (short-sleeve, long-sleeve, long-pants, shorts) that selects the blank 3D model.

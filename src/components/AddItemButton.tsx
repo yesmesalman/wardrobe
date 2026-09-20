@@ -10,7 +10,7 @@ export function AddItemButton() {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Add item"
-      onPress={startAdd}
+      onPress={() => startAdd()}
       hitSlop={8}
       style={({pressed}) => [styles.button, pressed && styles.pressed]}>
       <Text style={styles.text}>+ Add item</Text>
