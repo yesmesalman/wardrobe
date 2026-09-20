@@ -902,6 +902,93 @@ function erode(mask, w, h) {
   return out;
 }
 
+/**
+ * Peels the halo off the edge of a cut-out. Background removal leaves a thin
+ * fringe of anti-aliased and shadowed pixels around the garment; on the 3D
+ * model that fringe gets stretched into a light streak. A pixel on the edge
+ * is removed when its colour is far from the garment colour just inside it,
+ * and this repeats inwards until the edge is the garment itself.
+ */
+function peelFringe(mask, data, w, h) {
+  const PEEL_DISTANCE = 55; // colour difference (0-441) that counts as halo
+  const RADIUS = 12; // how far to look for the garment colour, in pixels
+  const MAX_PASSES = 8;
+  const FRINGE_DEPTH = 6; // the garment colour is measured this far inside
+
+  // "Core": pixels safely inside the garment, past any fringe.
+  let core = mask;
+  for (let i = 0; i < FRINGE_DEPTH; i++) {
+    core = erode(core, w, h);
+  }
+  // Integral images of the core's colour, to average it over a window.
+  const stride = w + 1;
+  const sum = [0, 1, 2].map(() => new Float64Array(stride * (h + 1)));
+  const count = new Float64Array(stride * (h + 1));
+  for (let y = 0; y < h; y++) {
+    let rowSum = [0, 0, 0];
+    let rowCount = 0;
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (core[i]) {
+        rowSum[0] += data[i * 4];
+        rowSum[1] += data[i * 4 + 1];
+        rowSum[2] += data[i * 4 + 2];
+        rowCount++;
+      }
+      const j = (y + 1) * stride + x + 1;
+      const up = y * stride + x + 1;
+      for (let c = 0; c < 3; c++) {
+        sum[c][j] = sum[c][up] + rowSum[c];
+      }
+      count[j] = count[up] + rowCount;
+    }
+  }
+  const window = (table, x, y) => {
+    const x0 = Math.max(0, x - RADIUS);
+    const x1 = Math.min(w, x + RADIUS + 1);
+    const y0 = Math.max(0, y - RADIUS);
+    const y1 = Math.min(h, y + RADIUS + 1);
+    return (
+      table[y1 * stride + x1] -
+      table[y0 * stride + x1] -
+      table[y1 * stride + x0] +
+      table[y0 * stride + x0]
+    );
+  };
+
+  const out = Uint8Array.from(mask);
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
+    const peel = [];
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        const onEdge =
+          out[i] && (!out[i - 1] || !out[i + 1] || !out[i - w] || !out[i + w]);
+        if (!onEdge) {
+          continue;
+        }
+        const n = window(count, x, y);
+        if (n < 20) {
+          continue; // nothing to compare with (a thin part): keep it
+        }
+        const dr = data[i * 4] - window(sum[0], x, y) / n;
+        const dg = data[i * 4 + 1] - window(sum[1], x, y) / n;
+        const db = data[i * 4 + 2] - window(sum[2], x, y) / n;
+        if (Math.hypot(dr, dg, db) > PEEL_DISTANCE) {
+          peel.push(i);
+        }
+      }
+    }
+    if (peel.length === 0) {
+      break;
+    }
+    peel.forEach(i => {
+      out[i] = 0;
+    });
+  }
+  return out;
+}
+
 function wholePhoto(image) {
   const {ctx, w, h} = drawScaled(image, ANALYSIS_SIZE);
   const data = ctx.getImageData(0, 0, w, h).data;
@@ -918,7 +1005,7 @@ function cutOut(image) {
   const {ctx, w, h} = drawScaled(image, ANALYSIS_SIZE);
   const data = ctx.getImageData(0, 0, w, h).data;
   const isBackground = findBackground(data, w, h, estimateBackground(data, w, h));
-  const mask = garmentMask(isBackground, w, h);
+  const mask = peelFringe(garmentMask(isBackground, w, h), data, w, h);
 
   let count = 0;
   let x0 = w;
