@@ -26,6 +26,10 @@ export function OutfitScreen() {
   const [viewing, setViewing] = useState<Garment | null>(null);
   const [shirtIndex, setShirtIndex] = useState(0);
   const [pantsIndex, setPantsIndex] = useState(0);
+  // Which way the last swipe went (1 = to the next item), so the new garment
+  // slides in from that side.
+  const [shirtSlide, setShirtSlide] = useState(0);
+  const [pantsSlide, setPantsSlide] = useState(0);
   const [split, setSplit] = useState(DEFAULT_SPLIT);
 
   const shirts = useMemo(
@@ -43,6 +47,15 @@ export function OutfitScreen() {
   const shirt = shirts[shirtAt] ?? null;
   const trousers = pants[pantsAt] ?? null;
 
+  const changeShirt = (next: number) => {
+    setShirtSlide(Math.sign(next - shirtAt));
+    setShirtIndex(next);
+  };
+  const changePants = (next: number) => {
+    setPantsSlide(Math.sign(next - pantsAt));
+    setPantsIndex(next);
+  };
+
   const percent = (fraction: number) => `${(fraction * 100).toFixed(2)}%` as const;
 
   return (
@@ -52,6 +65,8 @@ export function OutfitScreen() {
         <OutfitScene
           shirt={shirt}
           pants={trousers}
+          shirtSlide={shirtSlide}
+          pantsSlide={pantsSlide}
           onSplitChange={setSplit}
           style={StyleSheet.absoluteFill}
         />
@@ -59,7 +74,7 @@ export function OutfitScreen() {
           kind="shirt"
           count={shirts.length}
           index={shirtAt}
-          onIndexChange={setShirtIndex}
+          onIndexChange={changeShirt}
           onOpen={() => shirt && setViewing(shirt)}
           onAdd={() => startAdd('shirt')}
           style={[styles.top, {height: percent(split)}]}
@@ -68,7 +83,7 @@ export function OutfitScreen() {
           kind="pants"
           count={pants.length}
           index={pantsAt}
-          onIndexChange={setPantsIndex}
+          onIndexChange={changePants}
           onOpen={() => trousers && setViewing(trousers)}
           onAdd={() => startAdd('pants')}
           style={[styles.bottom, {top: percent(split)}]}

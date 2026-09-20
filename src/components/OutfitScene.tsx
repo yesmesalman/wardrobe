@@ -9,6 +9,12 @@ import {SCENE_HTML} from '../webview/sceneHtml';
 interface Props {
   shirt: Garment | null;
   pants: Garment | null;
+  /**
+   * Which side a newly chosen garment slides in from: 1 from the right (the
+   * next item), -1 from the left (the previous one), 0 for no slide.
+   */
+  shirtSlide?: number;
+  pantsSlide?: number;
   style?: ViewStyle;
   /** Fraction of the height, from the top, where the shirt meets the pants. */
   onSplitChange?: (split: number) => void;
@@ -31,9 +37,15 @@ async function loadPhoto(garment: Garment): Promise<Loaded> {
   };
 }
 
-const spec = (garment: Garment | null, loaded: Loaded | null) =>
+const spec = (
+  garment: Garment | null,
+  loaded: Loaded | null,
+  slide: number,
+) =>
   garment && loaded && loaded.id === garment.id
     ? {
+        id: garment.id,
+        slide,
         variant: garment.variant,
         photo: loaded.photo,
         mode: garment.mode,
@@ -46,7 +58,14 @@ const spec = (garment: Garment | null, loaded: Loaded | null) =>
  * A shirt over pants in one 3D scene, as if someone were wearing them. The
  * scene is a fixed front view; the app puts swipe zones on top of it.
  */
-export function OutfitScene({shirt, pants, style, onSplitChange}: Props) {
+export function OutfitScene({
+  shirt,
+  pants,
+  shirtSlide = 0,
+  pantsSlide = 0,
+  style,
+  onSplitChange,
+}: Props) {
   const web = useRef<WebView<object>>(null);
   const [ready, setReady] = useState(false);
   const [shown, setShown] = useState(false);
@@ -84,8 +103,8 @@ export function OutfitScene({shirt, pants, style, onSplitChange}: Props) {
     };
   }, [pants]);
 
-  const shirtSpec = spec(shirt, shirtImage);
-  const pantsSpec = spec(pants, pantsImage);
+  const shirtSpec = spec(shirt, shirtImage, shirtSlide);
+  const pantsSpec = spec(pants, pantsImage, pantsSlide);
   // Wait for images so a garment never flashes as a plain colour.
   const waiting = (shirt && !shirtSpec) || (pants && !pantsSpec);
 

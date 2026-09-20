@@ -14,7 +14,7 @@
  *       variant: 'short-sleeve' | 'long-sleeve' | 'long-pants' | 'shorts'
  *   __setColor(hex)                           fabric colour
  *   __setOutfit({shirt, pants})               show a shirt over pants, as if worn
- *       each: null or {variant, photo, mode, color, align}
+ *       each: null or {id, variant, photo, mode, color, align, slide}
  *   __setAutoRotate(bool)
  *   __setView('3d' | 'align')                 3D view or 2D alignment view
  *   __setAlign({sx, sy, ox, oy}), __resetAlign()
@@ -124,7 +124,8 @@ const state = {
   request: 0,
 };
 let garment = null; // {group, material, uniforms, texture, model}
-let outfit = []; // garments shown together by __setOutfit
+const outfit = {shirt: null, pants: null}; // garments shown by __setOutfit
+const transitions = []; // garments sliding in or out of the outfit
 let size = {width: 1, height: 1};
 
 // Outfit layout: the waist is y = 0, the shirt's hem overlaps the pants' top.
@@ -138,6 +139,9 @@ const OUTFIT = {
   // The pants are a little deeper than the shirt's hem; flatten them slightly
   // so the waistband stays tucked under the shirt.
   pantsDepth: 0.72,
+  // Garments slide this far sideways, in this many ms, when swapped.
+  slideDistance: 1.4,
+  slideMs: 300,
 };
 
 function loadModel(variant) {
@@ -267,9 +271,48 @@ function disposeGarment() {
   }
 }
 
+/** Jumps any slide in progress to its end (removing garments that left). */
+function finishTransitions() {
+  transitions.splice(0).forEach(t => {
+    t.g.group.position.x = t.to;
+    t.done && t.done();
+  });
+}
+
+function slide(g, from, to, done) {
+  g.group.position.x = from;
+  transitions.push({
+    g,
+    from,
+    to,
+    done,
+    start: performance.now(),
+    duration: OUTFIT.slideMs,
+  });
+}
+
+/** Advances slides; ease-out so a garment settles gently into place. */
+function stepTransitions(now) {
+  for (let i = transitions.length - 1; i >= 0; i--) {
+    const t = transitions[i];
+    const k = Math.min(1, (now - t.start) / t.duration);
+    const eased = 1 - (1 - k) ** 3;
+    t.g.group.position.x = t.from + (t.to - t.from) * eased;
+    if (k >= 1) {
+      transitions.splice(i, 1);
+      t.done && t.done();
+    }
+  }
+}
+
 function disposeOutfit() {
-  outfit.forEach(disposeOf);
-  outfit = [];
+  finishTransitions();
+  ['shirt', 'pants'].forEach(part => {
+    if (outfit[part]) {
+      disposeOf(outfit[part]);
+      outfit[part] = null;
+    }
+  });
 }
 
 /** Builds a garment (not yet added to the scene) from a model and a photo. */
@@ -351,57 +394,80 @@ async function setGarment({variant, photo, mode, align}) {
   }
 }
 
-/** Shows a shirt over pants at their natural positions, as if worn. */
-async function setOutfit({shirt, pants}) {
+/**
+ * Shows a shirt over pants at their natural positions, as if worn. Only the
+ * parts whose garment changed are rebuilt. A changed part slides in from the
+ * side given by its `slide` (1 = from the right, -1 = from the left) while the
+ * old one slides out the other way.
+ */
+async function setOutfit(specs) {
   const request = ++state.request;
   try {
-    const parts = await Promise.all(
-      [
-        ['shirt', shirt],
-        ['pants', pants],
-      ].map(async ([part, spec]) =>
-        spec
-          ? {
-              part,
-              spec,
-              model: await loadModel(spec.variant),
-              texture: spec.photo ? await loadTexture(spec.photo) : null,
-            }
-          : null,
-      ),
+    const loaded = await Promise.all(
+      ['shirt', 'pants'].map(async part => {
+        const spec = specs[part];
+        if (!spec) {
+          return {part, spec: null};
+        }
+        if (outfit[part] && outfit[part].key === spec.id) {
+          return {part, keep: true};
+        }
+        return {
+          part,
+          spec,
+          model: await loadModel(spec.variant),
+          texture: spec.photo ? await loadTexture(spec.photo) : null,
+        };
+      }),
     );
     if (request !== state.request) {
-      parts.forEach(p => p && p.texture && p.texture.dispose());
+      loaded.forEach(p => p.texture && p.texture.dispose());
       return;
     }
     disposeGarment();
-    disposeOutfit();
+    finishTransitions();
     state.outfit = true;
     state.view = '3d';
     alignPlane.visible = false;
 
-    parts.forEach(p => {
-      if (!p) {
+    loaded.forEach(item => {
+      const {part} = item;
+      const old = outfit[part];
+      if (item.keep) {
+        return;
+      }
+      if (!item.spec) {
+        if (old) {
+          disposeOf(old);
+          outfit[part] = null;
+        }
         return;
       }
       const g = createGarment(
-        p.model,
-        p.texture,
-        p.spec.mode,
-        p.spec.color,
-        p.spec.align,
+        item.model,
+        item.texture,
+        item.spec.mode,
+        item.spec.color,
+        item.spec.align,
       );
-      const height = p.model.size.height;
+      g.key = item.spec.id;
+      const height = item.model.size.height;
       // Models are centred on their own bounding box; hang them from the waist.
       g.group.position.y =
-        p.part === 'shirt'
-          ? -OUTFIT.overlap + height / 2
-          : -height / 2;
-      if (p.part === 'pants') {
+        part === 'shirt' ? -OUTFIT.overlap + height / 2 : -height / 2;
+      if (part === 'pants') {
         g.group.scale.z = OUTFIT.pantsDepth;
       }
       spinner.add(g.group);
-      outfit.push(g);
+      outfit[part] = g;
+
+      const dir = Math.sign(item.spec.slide || 0);
+      if (old && dir) {
+        slide(old, 0, -dir * OUTFIT.slideDistance, () => disposeOf(old));
+        slide(g, dir * OUTFIT.slideDistance, 0);
+      } else if (old) {
+        disposeOf(old);
+      }
     });
     fitCamera();
     post({type: 'loaded'});
@@ -537,6 +603,7 @@ function frame(now) {
     state.yaw += delta * SPIN_SPEED;
   }
   spinner.rotation.y = aligning || state.outfit ? 0 : state.yaw;
+  stepTransitions(now);
   renderer.render(scene, aligning ? alignCamera : camera);
   requestAnimationFrame(frame);
 }
