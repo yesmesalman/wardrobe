@@ -138,10 +138,10 @@ const outfitCam = {distance: 4, centre: 0, tDistance: 4, tCentre: 0, snap: true}
 const OUTFIT = {
   overlap: 0.09,
   shirtHeight: 0.74,
-  pantsHeight: 1.02,
+  pantsHeight: 1.14,
   // Framing: the figure fills the height (with this much air) unless a wide
   // long-sleeve shirt needs the width; the camera glides when that changes.
-  heightMargin: 1.16,
+  heightMargin: 1.12,
   widthMargin: 1.06,
   defaultWidth: 0.9,
   // The pants are a little deeper than the shirt's hem; flatten them slightly

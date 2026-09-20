@@ -283,21 +283,28 @@ function buildShirt({long = false} = {}) {
 // Pants
 // ---------------------------------------------------------------------------
 
-/** Full-length pants, or shorts that stop at the knee. */
+/**
+ * Full-length pants, or shorts that stop at the knee.
+ *
+ * The waist is at y = 1. The legs overlap at the top so they close the gap
+ * between them (no bulging pouch at the crotch) and only separate below the
+ * fork, at about y = 0.44. Long pants reach well below y = 0, so the inseam
+ * (fork to hem, about 0.58) and the hem are long.
+ */
 function buildPants({shorts = false} = {}) {
   const mesh = new Mesh();
   const RING = 64;
   const TOP = 1.0;
-  const HIP_BOTTOM = 0.5;
-  const LEG_TOP = 0.66;
-  const LEG_BOTTOM = shorts ? 0.3 : 0;
+  const HIP_BOTTOM = 0.58;
+  const LEG_TOP = 0.76;
+  const LEG_BOTTOM = shorts ? 0.3 : -0.14;
 
-  // Waist to hip: [y, half width, half depth]. The hip tube tapers inwards at
-  // the bottom so it disappears inside the legs, forming the crotch seam.
+  // Waist to hip: [y, half width, half depth]. The bottom of the hip tube is
+  // no deeper than the two legs joined together, so it disappears inside them.
   const hips = [
-    [HIP_BOTTOM, 0.17, 0.09],
-    [0.6, 0.232, 0.13],
-    [0.72, 0.228, 0.127],
+    [HIP_BOTTOM, 0.2, 0.088],
+    [0.68, 0.226, 0.122],
+    [0.76, 0.226, 0.126],
     [0.86, 0.208, 0.114],
     [0.94, 0.194, 0.106],
     [TOP, 0.194, 0.106],
@@ -318,16 +325,19 @@ function buildPants({shorts = false} = {}) {
   }
   mesh.addLoft(hipRows);
 
-  // Legs: [y, centre x, half width, half depth]. They start inside the hips.
+  // Legs: [y, centre x, half width, half depth]. Above the fork the two legs
+  // overlap at the centre; below it they part and taper to the hem.
   const leg = [
-    [0.0, 0.11, 0.083, 0.085],
-    [0.12, 0.111, 0.088, 0.09],
-    [0.28, 0.112, 0.096, 0.1],
-    [0.42, 0.114, 0.108, 0.114],
-    [0.52, 0.114, 0.114, 0.126],
-    [LEG_TOP, 0.114, 0.104, 0.112],
+    [-0.14, 0.108, 0.084, 0.086],
+    [-0.02, 0.109, 0.088, 0.09],
+    [0.14, 0.11, 0.094, 0.098],
+    [0.3, 0.111, 0.1, 0.106],
+    [0.44, 0.111, 0.11, 0.116],
+    [0.54, 0.104, 0.12, 0.122],
+    [0.66, 0.1, 0.122, 0.122],
+    [LEG_TOP, 0.1, 0.12, 0.118],
   ];
-  const LEG_ROWS = 40;
+  const LEG_ROWS = 48;
   [1, -1].forEach(side => {
     const rows = [];
     for (let r = 0; r < LEG_ROWS; r++) {
@@ -337,11 +347,11 @@ function buildPants({shorts = false} = {}) {
       for (let i = 0; i < RING; i++) {
         const theta = (i / RING) * TAU;
         let [x, z] = superEllipse(theta, w, d, 2.3);
-        // Gentle wrinkles that gather towards the ankle.
+        // Gentle wrinkles that gather towards the hem.
         const fold =
           0.005 *
           Math.sin(10 * theta + 22 * y) *
-          (1 - (y - LEG_BOTTOM) / (LEG_TOP - LEG_BOTTOM)) ** 1.5;
+          Math.max(0, 1 - (y - LEG_BOTTOM) / (LEG_TOP - LEG_BOTTOM)) ** 1.5;
         x += Math.sign(x) * fold;
         z += Math.sign(z) * fold;
         ring.push([side * cx + x, y, z]);
@@ -355,9 +365,9 @@ function buildPants({shorts = false} = {}) {
   return {
     mesh,
     name: 'Pants',
-    // Front of the left thigh.
+    // Front of the left thigh (about y = 0.64 above the hem line).
     decal: {
-      position: [0.115, shorts ? -0.01 : 0.14, 0.14],
+      position: [0.105, 0.64 - mid[1], 0.14],
       rotation: [0, 0, 0],
       scale: [0.17, 0.17, 0.3],
     },
