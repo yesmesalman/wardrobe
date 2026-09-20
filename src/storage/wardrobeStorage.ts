@@ -6,6 +6,7 @@ import {
   unlink,
   writeFile,
 } from '@dr.pogodin/react-native-fs';
+import {DEFAULT_ALIGN} from '../constants';
 import type {Garment} from '../types';
 
 // Only file names are persisted: the app container path can change between
@@ -25,7 +26,15 @@ export async function loadGarments(): Promise<Garment[]> {
       return [];
     }
     const parsed = JSON.parse(await readFile(indexPath(), 'utf8'));
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    // Garments saved before "fit" mode existed only have a printed photo.
+    return parsed.map(g => ({
+      ...g,
+      mode: g.mode ?? 'print',
+      align: g.align ?? DEFAULT_ALIGN,
+    }));
   } catch {
     return [];
   }
@@ -35,27 +44,44 @@ export async function saveGarments(garments: Garment[]): Promise<void> {
   await writeFile(indexPath(), JSON.stringify(garments), 'utf8');
 }
 
-/** Stores a garment's photo and its 3D snapshot (both base64 JPEG). */
+export interface GarmentFiles {
+  /** Base64 JPEG of the photo. */
+  photoBase64: string;
+  /** Base64 PNG of the garment cut out of the photo (fit mode). */
+  cutoutBase64?: string;
+  /** Base64 JPEG snapshot of the garment in 3D. */
+  thumbBase64: string;
+}
+
+/** Stores a garment's photo, cut-out and 3D snapshot; returns file names. */
 export async function saveGarmentFiles(
   id: string,
-  photoBase64: string,
-  thumbBase64: string,
-): Promise<{photoFile: string; thumbFile: string}> {
+  {photoBase64, cutoutBase64, thumbBase64}: GarmentFiles,
+): Promise<{photoFile: string; cutoutFile?: string; thumbFile: string}> {
   await mkdir(garmentsDir());
   const photoFile = `${id}.jpg`;
   const thumbFile = `${id}-thumb.jpg`;
   await writeFile(filePath(photoFile), photoBase64, 'base64');
   await writeFile(filePath(thumbFile), thumbBase64, 'base64');
-  return {photoFile, thumbFile};
+  let cutoutFile: string | undefined;
+  if (cutoutBase64) {
+    cutoutFile = `${id}-cutout.png`;
+    await writeFile(filePath(cutoutFile), cutoutBase64, 'base64');
+  }
+  return {photoFile, cutoutFile, thumbFile};
 }
 
-export function readPhotoBase64(photoFile: string): Promise<string> {
-  return readFile(filePath(photoFile), 'base64');
+export function readFileBase64(fileName: string): Promise<string> {
+  return readFile(filePath(fileName), 'base64');
 }
 
 export async function deleteGarmentFiles(garment: Garment): Promise<void> {
+  const names = [garment.photoFile, garment.thumbFile, garment.cutoutFile];
   await Promise.all(
-    [garment.photoFile, garment.thumbFile].map(async name => {
+    names.map(async name => {
+      if (!name) {
+        return;
+      }
       const path = filePath(name);
       if (await exists(path)) {
         await unlink(path);

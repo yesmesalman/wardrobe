@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {Alert, FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {AddGarmentModal} from '../components/AddGarmentModal';
+import {AddGarmentModal, GarmentDraft} from '../components/AddGarmentModal';
 import {GarmentCard} from '../components/GarmentCard';
 import {GarmentViewerModal} from '../components/GarmentViewerModal';
 import {SegmentedControl} from '../components/SegmentedControl';
@@ -59,13 +59,13 @@ export function LibraryScreen() {
     setTimeout(choosePhotoSource, 400);
   };
 
-  const save = async (kind: GarmentKind, color: string, thumbBase64: string) => {
+  const save = async (draft: GarmentDraft) => {
     if (!draftPhoto) {
       return;
     }
-    await add({kind, color, photoBase64: draftPhoto, thumbBase64});
+    await add({...draft, photoBase64: draftPhoto});
     setDraftPhoto(null);
-    setTab(kind);
+    setTab(draft.kind);
   };
 
   return (

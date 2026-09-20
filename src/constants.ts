@@ -1,4 +1,4 @@
-import type {GarmentKind} from './types';
+import type {Align, GarmentKind} from './types';
 
 /** How many shirts and how many pants the wardrobe holds. */
 export const MAX_PER_KIND = 20;
@@ -8,6 +8,8 @@ export const KIND_LABELS: Record<GarmentKind, {singular: string; plural: string}
     shirt: {singular: 'Shirt', plural: 'Shirts'},
     pants: {singular: 'Pants', plural: 'Pants'},
   };
+
+export const DEFAULT_ALIGN: Align = {sx: 1, sy: 1, ox: 0, oy: 0};
 
 export const GARMENT_COLORS = [
   {name: 'Snow', hex: '#F2F0EB'},

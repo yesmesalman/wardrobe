@@ -2,9 +2,9 @@ import React, {useEffect, useState} from 'react';
 import {Alert, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {KIND_LABELS, theme} from '../constants';
-import {readPhotoBase64} from '../storage/wardrobeStorage';
+import {readFileBase64} from '../storage/wardrobeStorage';
 import type {Garment} from '../types';
-import {GarmentView} from './GarmentView';
+import {GarmentView, Photo} from './GarmentView';
 
 interface Props {
   garment: Garment | null;
@@ -14,14 +14,26 @@ interface Props {
 
 export function GarmentViewerModal({garment, onClose, onDelete}: Props) {
   const insets = useSafeAreaInsets();
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<Photo | null>(null);
 
-  // The photo lives in a file; read it when a garment is opened.
+  // The image lives in a file; read it when a garment is opened. Fit mode
+  // shows the cut-out (PNG), print mode the photo (JPEG).
   useEffect(() => {
     setPhoto(null);
-    if (garment) {
-      readPhotoBase64(garment.photoFile).then(setPhoto, () => setPhoto(null));
+    if (!garment) {
+      return;
     }
+    let cancelled = false;
+    const fit = garment.mode === 'fit' && garment.cutoutFile;
+    readFileBase64(fit ? garment.cutoutFile! : garment.photoFile).then(
+      base64 =>
+        !cancelled &&
+        setPhoto({base64, mime: fit ? 'image/png' : 'image/jpeg'}),
+      () => !cancelled && setPhoto(null),
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [garment]);
 
   const confirmDelete = () => {
@@ -68,7 +80,9 @@ export function GarmentViewerModal({garment, onClose, onDelete}: Props) {
             key={garment.id}
             kind={garment.kind}
             color={garment.color}
-            photoBase64={photo}
+            photo={photo}
+            mode={garment.mode}
+            align={garment.align}
             style={styles.scene}
           />
         ) : null}

@@ -40,7 +40,9 @@ const addMany = async (
     await ReactTestRenderer.act(async () => {
       await wardrobe.current.add({
         kind,
+        mode: 'print' as const,
         color: '#fff',
+        align: {sx: 1, sy: 1, ox: 0, oy: 0},
         photoBase64: 'cGhvdG8=',
         thumbBase64: 'dGh1bWI=',
       });
@@ -59,7 +61,9 @@ test('keeps at most 20 shirts and 20 pants, independently', async () => {
   await expect(
     wardrobe.current.add({
       kind: 'shirt',
+      mode: 'print',
       color: '#fff',
+      align: {sx: 1, sy: 1, ox: 0, oy: 0},
       photoBase64: 'cGhvdG8=',
       thumbBase64: 'dGh1bWI=',
     }),

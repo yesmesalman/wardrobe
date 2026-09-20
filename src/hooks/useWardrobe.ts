@@ -6,13 +6,17 @@ import {
   saveGarmentFiles,
   saveGarments,
 } from '../storage/wardrobeStorage';
-import type {Garment, GarmentKind} from '../types';
+import type {Align, Garment, GarmentKind, PhotoMode} from '../types';
 
 export interface NewGarment {
   kind: GarmentKind;
+  mode: PhotoMode;
   color: string;
+  align: Align;
   /** Base64 JPEG of the user's photo. */
   photoBase64: string;
+  /** Base64 PNG of the garment cut out of the photo (fit mode). */
+  cutoutBase64?: string;
   /** Base64 JPEG snapshot of the garment in 3D. */
   thumbBase64: string;
 }
@@ -50,13 +54,21 @@ export function useWardrobe() {
   );
 
   const add = useCallback(
-    async ({kind, color, photoBase64, thumbBase64}: NewGarment) => {
+    async ({kind, mode, color, align, ...images}: NewGarment) => {
       if (counts[kind] >= MAX_PER_KIND) {
         throw new Error(`You can only keep ${MAX_PER_KIND} of each garment.`);
       }
       const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-      const files = await saveGarmentFiles(id, photoBase64, thumbBase64);
-      const garment: Garment = {id, kind, color, createdAt: Date.now(), ...files};
+      const files = await saveGarmentFiles(id, images);
+      const garment: Garment = {
+        id,
+        kind,
+        mode,
+        color,
+        align,
+        createdAt: Date.now(),
+        ...files,
+      };
       setGarments(prev => [garment, ...prev]);
       return garment;
     },
