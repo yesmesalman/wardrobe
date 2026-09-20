@@ -1,67 +1,43 @@
 import React from 'react';
-import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Image, Pressable, StyleSheet} from 'react-native';
 import {theme, VARIANT_LABELS} from '../constants';
 import {fileUri} from '../storage/wardrobeStorage';
 import type {Garment} from '../types';
 
 interface Props {
   garment: Garment;
+  /** Width in points; the card is 4:5, like the 3D snapshot inside it. */
+  width: number;
   onPress: (garment: Garment) => void;
 }
 
-export function GarmentCard({garment, onPress}: Props) {
-  const label = VARIANT_LABELS[garment.variant];
-  const added = new Date(garment.createdAt).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-  });
+/** A bordered box with the garment's 3D snapshot in it, and nothing else. */
+export function GarmentCard({garment, width, onPress}: Props) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Open ${label} in 3D`}
+      accessibilityLabel={`Open ${VARIANT_LABELS[garment.variant]} in 3D`}
       onPress={() => onPress(garment)}
-      style={({pressed}) => [styles.card, pressed && styles.pressed]}>
+      style={({pressed}) => [styles.card, {width}, pressed && styles.pressed]}>
       <Image
         source={{uri: fileUri(garment.thumbFile)}}
         accessibilityIgnoresInvertColors
-        style={styles.scene}
+        resizeMode="cover"
+        style={styles.image}
       />
-      <View style={styles.footer}>
-        <View>
-          <Text style={styles.title}>{label}</Text>
-          <Text style={styles.date}>{added}</Text>
-        </View>
-        <View style={[styles.dot, {backgroundColor: garment.color}]} />
-      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1,
-    backgroundColor: theme.surface,
-    borderRadius: 20,
+    aspectRatio: 0.8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    backgroundColor: theme.sceneBottom,
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.line,
   },
-  pressed: {opacity: 0.85},
-  scene: {width: '100%', aspectRatio: 0.8, backgroundColor: theme.sceneBottom},
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  title: {fontSize: 15, fontWeight: '600', color: theme.ink},
-  date: {fontSize: 12, color: theme.muted, marginTop: 2},
-  dot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.muted,
-  },
+  pressed: {opacity: 0.8},
+  image: {width: '100%', height: '100%'},
 });

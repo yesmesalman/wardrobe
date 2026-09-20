@@ -71,6 +71,8 @@ test('has Outfit, Library and Settings tabs, with Add item on Outfit and Library
   expect(text).toContain('Pants 0/20');
   expect(text).toContain('No shirts yet');
   expect(text).toContain('Add item');
+  // Tab bar order: Outfit sits in the centre.
+  expect(text.endsWith('Library|Outfit|Settings')).toBe(true);
 
   await openTab(renderer, 'Outfit');
   text = screenText(renderer);

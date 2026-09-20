@@ -1,16 +1,24 @@
 import React, {useState} from 'react';
-import {FlatList, StyleSheet, Text, View} from 'react-native';
+import {FlatList, StyleSheet, Text, useWindowDimensions, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {AddItemFab, FAB_CLEARANCE} from '../components/AddItemFab';
 import {GarmentCard} from '../components/GarmentCard';
 import {GarmentViewerModal} from '../components/GarmentViewerModal';
+import {ScreenHeader} from '../components/ScreenHeader';
 import {SegmentedControl} from '../components/SegmentedControl';
 import {KIND_LABELS, MAX_PER_KIND, theme} from '../constants';
 import {useWardrobeContext} from '../state/WardrobeContext';
 import type {Garment} from '../types';
 
+const COLUMNS = 4;
+const SIDE_PADDING = 16;
+const GAP = 8;
+
 export function LibraryScreen() {
   const insets = useSafeAreaInsets();
+  const {width} = useWindowDimensions();
+  const cardWidth = Math.floor(
+    (width - SIDE_PADDING * 2 - GAP * (COLUMNS - 1)) / COLUMNS,
+  );
   const {
     wardrobe: {garments, loaded, counts, remove},
     libraryTab: tab,
@@ -23,10 +31,7 @@ export function LibraryScreen() {
 
   return (
     <View style={[styles.root, {paddingTop: insets.top}]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Library</Text>
-        <Text style={styles.subtitle}>Your wardrobe in 3D</Text>
-      </View>
+      <ScreenHeader title="Library" subtitle="Your wardrobe in 3D" showAdd />
 
       <View style={styles.tabs}>
         <SegmentedControl
@@ -42,11 +47,11 @@ export function LibraryScreen() {
       <FlatList
         data={visible}
         keyExtractor={g => g.id}
-        numColumns={2}
+        numColumns={COLUMNS}
         columnWrapperStyle={styles.row}
-        contentContainerStyle={[styles.list, {paddingBottom: FAB_CLEARANCE}]}
+        contentContainerStyle={styles.list}
         renderItem={({item}) => (
-          <GarmentCard garment={item} onPress={setViewing} />
+          <GarmentCard garment={item} width={cardWidth} onPress={setViewing} />
         )}
         ListEmptyComponent={
           loaded ? (
@@ -55,14 +60,12 @@ export function LibraryScreen() {
                 No {labels.plural.toLowerCase()} yet
               </Text>
               <Text style={styles.emptyText}>
-                Tap “Add item” to photograph one and see it in 3D.
+                Tap “Add item” at the top right to photograph one and see it in 3D.
               </Text>
             </View>
           ) : undefined
         }
       />
-
-      <AddItemFab />
 
       <GarmentViewerModal
         garment={viewing}
@@ -75,12 +78,9 @@ export function LibraryScreen() {
 
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: theme.background},
-  header: {paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16},
-  title: {fontSize: 32, fontWeight: '800', color: theme.ink},
-  subtitle: {fontSize: 15, color: theme.muted, marginTop: 2},
   tabs: {paddingHorizontal: 20, paddingBottom: 16},
-  list: {paddingHorizontal: 16, gap: 12},
-  row: {gap: 12},
+  list: {paddingHorizontal: SIDE_PADDING, paddingBottom: 24, gap: GAP},
+  row: {gap: GAP},
   empty: {alignItems: 'center', paddingTop: 80, paddingHorizontal: 40},
   emptyTitle: {fontSize: 18, fontWeight: '700', color: theme.ink},
   emptyText: {

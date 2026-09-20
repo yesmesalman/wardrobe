@@ -56,14 +56,14 @@ function App() {
               tabBarLabelStyle: {fontSize: 12, fontWeight: '600'},
             }}>
             <Tab.Screen
-              name="Outfit"
-              component={OutfitScreen}
-              options={{tabBarIcon: outfitIcon}}
-            />
-            <Tab.Screen
               name="Library"
               component={LibraryScreen}
               options={{tabBarIcon: libraryIcon}}
+            />
+            <Tab.Screen
+              name="Outfit"
+              component={OutfitScreen}
+              options={{tabBarIcon: outfitIcon}}
             />
             <Tab.Screen
               name="Settings"

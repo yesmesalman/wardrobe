@@ -57,6 +57,7 @@ export const theme = {
   ink: '#1C1B1A',
   muted: '#77726B',
   line: '#E4DFD7',
+  cardBorder: '#CFC8BC',
   accent: '#2F3E46',
   accentText: '#FFFFFF',
   danger: '#B3402E',
