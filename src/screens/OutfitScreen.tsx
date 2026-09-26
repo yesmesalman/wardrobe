@@ -1,13 +1,11 @@
 import React, {useMemo, useState} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {GarmentViewerModal} from '../components/GarmentViewerModal';
 import {OutfitScene} from '../components/OutfitScene';
 import {OutfitSwipeZone} from '../components/OutfitSwipeZone';
 import {ScreenHeader} from '../components/ScreenHeader';
 import {theme} from '../constants';
 import {useWardrobeContext} from '../state/WardrobeContext';
-import type {Garment} from '../types';
 
 /** Until the scene reports where the waist falls, assume roughly here. */
 const DEFAULT_SPLIT = 0.5;
@@ -20,10 +18,9 @@ const DEFAULT_SPLIT = 0.5;
 export function OutfitScreen() {
   const insets = useSafeAreaInsets();
   const {
-    wardrobe: {garments, loaded, remove},
+    wardrobe: {garments, loaded},
     startAdd,
   } = useWardrobeContext();
-  const [viewing, setViewing] = useState<Garment | null>(null);
   const [shirtIndex, setShirtIndex] = useState(0);
   const [pantsIndex, setPantsIndex] = useState(0);
   // Which way the last swipe went (1 = to the next item), so the new garment
@@ -76,7 +73,6 @@ export function OutfitScreen() {
           count={shirts.length}
           index={shirtAt}
           onIndexChange={changeShirt}
-          onOpen={() => shirt && setViewing(shirt)}
           onAdd={() => startAdd('shirt')}
           style={[styles.top, {height: percent(split)}]}
         />
@@ -86,16 +82,10 @@ export function OutfitScreen() {
           count={pants.length}
           index={pantsAt}
           onIndexChange={changePants}
-          onOpen={() => trousers && setViewing(trousers)}
           onAdd={() => startAdd('pants')}
           style={[styles.bottom, {top: percent(split)}]}
         />
       </View>
-      <GarmentViewerModal
-        garment={viewing}
-        onClose={() => setViewing(null)}
-        onDelete={remove}
-      />
     </View>
   );
 }

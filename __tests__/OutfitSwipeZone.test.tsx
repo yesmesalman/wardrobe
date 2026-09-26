@@ -50,7 +50,6 @@ describe('OutfitSwipeZone', () => {
         count={6}
         index={1}
         onIndexChange={jest.fn()}
-        onOpen={jest.fn()}
         onAdd={jest.fn()}
       />,
     );
@@ -64,31 +63,10 @@ describe('OutfitSwipeZone', () => {
         count={1}
         index={0}
         onIndexChange={jest.fn()}
-        onOpen={jest.fn()}
         onAdd={jest.fn()}
       />,
     );
     expect(text(renderer)).toBe('');
-  });
-
-  test('opens the garment when tapped', async () => {
-    const onOpen = jest.fn();
-    const renderer = await render(
-      <OutfitSwipeZone
-        kind="shirt"
-        count={2}
-        index={0}
-        onIndexChange={jest.fn()}
-        onOpen={onOpen}
-        onAdd={jest.fn()}
-      />,
-    );
-    await ReactTestRenderer.act(async () => {
-      renderer.root
-        .find(node => node.props.accessibilityLabel === 'Open shirt')
-        .props.onPress();
-    });
-    expect(onOpen).toHaveBeenCalled();
   });
 
   test('shows no placeholder while the wardrobe is still loading', async () => {
@@ -99,7 +77,6 @@ describe('OutfitSwipeZone', () => {
         count={0}
         index={0}
         onIndexChange={jest.fn()}
-        onOpen={jest.fn()}
         onAdd={jest.fn()}
       />,
     );
@@ -114,7 +91,6 @@ describe('OutfitSwipeZone', () => {
         count={0}
         index={0}
         onIndexChange={jest.fn()}
-        onOpen={jest.fn()}
         onAdd={onAdd}
       />,
     );

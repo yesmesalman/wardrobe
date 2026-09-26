@@ -13,6 +13,7 @@ import {AddShirtModal} from '../components/AddShirtModal';
 import type {GarmentDraft} from '../components/AddGarmentModal';
 import {KIND_LABELS, MAX_PER_KIND} from '../constants';
 import {PhotoSource, pickPhoto} from '../hooks/pickPhoto';
+import {navigationRef} from '../navigationRef';
 import {useWardrobe} from '../hooks/useWardrobe';
 import type {GarmentKind} from '../types';
 
@@ -104,6 +105,9 @@ export function WardrobeProvider({children}: {children: ReactNode}) {
     await wardrobe.add({...result, mode: 'fit', photoBase64: draft.photo});
     setDraft(null);
     setLibraryTab(result.kind);
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('Library' as never);
+    }
   };
 
   const startAdd = (kind?: GarmentKind) => {

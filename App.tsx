@@ -14,6 +14,7 @@ import {LibraryScreen} from './src/screens/LibraryScreen';
 import {OutfitScreen} from './src/screens/OutfitScreen';
 import {SettingsScreen} from './src/screens/SettingsScreen';
 import {TrendingScreen} from './src/screens/TrendingScreen';
+import {navigationRef} from './src/navigationRef';
 import {WardrobeProvider} from './src/state/WardrobeContext';
 
 const Tab = createBottomTabNavigator();
@@ -54,7 +55,7 @@ function App() {
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" />
       <WardrobeProvider>
-        <NavigationContainer theme={navigationTheme}>
+        <NavigationContainer ref={navigationRef} theme={navigationTheme}>
           <Tab.Navigator
             initialRouteName="Library"
             screenOptions={{

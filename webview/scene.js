@@ -136,7 +136,7 @@ let size = {width: 1, height: 1};
 // Outfit layout: the waist is y = 0, the shirt's hem overlaps the pants' top.
 const outfitCam = {distance: 4, centre: 0, tDistance: 4, tCentre: 0, snap: true};
 const OUTFIT = {
-  overlap: 0.09,
+  overlap: 0.13,
   shirtHeight: 0.74,
   pantsHeight: 1.14,
   // Framing: the figure fills the height (with this much air) unless a wide

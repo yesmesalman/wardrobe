@@ -1,4 +1,4 @@
-import React, {useMemo, useRef} from 'react';
+import React, {useMemo} from 'react';
 import {
   PanResponder,
   Pressable,
@@ -19,8 +19,6 @@ interface Props {
   count: number;
   index: number;
   onIndexChange: (index: number) => void;
-  /** Tapped while an item is showing. */
-  onOpen: () => void;
   /** Tapped on the placeholder shown when there is nothing to pick from. */
   onAdd: () => void;
   style?: StyleProp<ViewStyle>;
@@ -28,9 +26,6 @@ interface Props {
 
 /** A swipe further than this many points changes the item. */
 export const SWIPE_DISTANCE = 45;
-
-/** A press this soon after a swipe began is the tail of the swipe, not a tap. */
-const TAP_AFTER_SWIPE_MS = 400;
 
 /**
  * Where a horizontal swipe of `dx` points lands: a swipe left moves to the
@@ -53,7 +48,7 @@ const EMPTY_TITLE: Record<GarmentKind, string> = {
 
 /**
  * An invisible touch area over one garment of the outfit: swipe sideways to
- * pick another from the Library, tap to open it. It draws only a small
+ * pick another from the Library. It draws only a small
  * position badge, or a dashed placeholder when there is nothing to show.
  */
 export function OutfitSwipeZone({
@@ -62,20 +57,15 @@ export function OutfitSwipeZone({
   count,
   index,
   onIndexChange,
-  onOpen,
   onAdd,
   style,
 }: Props) {
-  const swipeStartedAt = useRef(0);
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         // Only claim clearly horizontal drags, so taps still reach the button.
         onMoveShouldSetPanResponder: (_, g) =>
           Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
-        onPanResponderGrant: () => {
-          swipeStartedAt.current = Date.now();
-        },
         onPanResponderRelease: (_, g) =>
           onIndexChange(stepIndex(index, g.dx, count)),
       }),
@@ -106,16 +96,6 @@ export function OutfitSwipeZone({
 
   return (
     <View style={[styles.zone, style]} {...panResponder.panHandlers}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${kind}`}
-        onPress={() => {
-          if (Date.now() - swipeStartedAt.current > TAP_AFTER_SWIPE_MS) {
-            onOpen();
-          }
-        }}
-        style={StyleSheet.absoluteFill}
-      />
       {count > 1 ? (
         <View style={styles.badge} pointerEvents="none">
           <Text style={styles.badgeText}>
