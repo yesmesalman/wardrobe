@@ -60,7 +60,7 @@ export function OutfitScreen() {
 
   return (
     <View style={[styles.root, {paddingTop: insets.top}]}>
-      <ScreenHeader title="Outfit" subtitle="Swipe to mix and match" showAdd />
+      <ScreenHeader title="Outfit" subtitle="Swipe to mix and match" />
       <View style={styles.panel}>
         <OutfitScene
           shirt={shirt}

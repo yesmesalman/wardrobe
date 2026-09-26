@@ -341,9 +341,9 @@ function buildPants({shorts = false} = {}) {
   // Shorts have a roomier, straighter leg than the slim jeans: the inner edge
   // still runs straight to the fork, but the outer edge stays put.
   const shortsLeg = [
-    [0.3, 0.13, 0.092, 0.1],
-    [0.4, 0.125, 0.0975, 0.108],
-    [0.5, 0.1197, 0.1028, 0.114],
+    [0.3, 0.112, 0.092, 0.1],
+    [0.4, 0.111, 0.0975, 0.108],
+    [0.5, 0.1107, 0.1028, 0.114],
     [0.6, 0.1144, 0.1081, 0.12],
   ];
   const leg = [

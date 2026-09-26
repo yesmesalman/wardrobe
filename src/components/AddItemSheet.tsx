@@ -3,7 +3,7 @@ import {Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {MAX_PER_KIND, theme} from '../constants';
 import type {GarmentKind} from '../types';
-import {PantsIcon, ShirtIcon} from './icons';
+import {CloseIcon, PantsIcon, ShirtIcon} from './icons';
 
 interface Props {
   visible: boolean;
@@ -24,13 +24,21 @@ export function AddItemSheet({visible, counts, onChoose, onClose}: Props) {
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         {/* Swallows taps so pressing the sheet does not close it. */}
         <Pressable
           style={[styles.sheet, {paddingBottom: insets.bottom + 20}]}
           onPress={() => {}}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            onPress={onClose}
+            hitSlop={12}
+            style={styles.close}>
+            <CloseIcon size={24} color={theme.ink} />
+          </Pressable>
           <Text style={styles.title}>Add item</Text>
           <Text style={styles.subtitle}>What are you adding?</Text>
           <View style={styles.options}>
@@ -49,7 +57,7 @@ export function AddItemSheet({visible, counts, onChoose, onClose}: Props) {
                     full && styles.optionFull,
                     pressed && styles.optionPressed,
                   ]}>
-                  <Icon size={54} color={theme.accent} strokeWidth={1.4} />
+                  <Icon size={62} color={theme.accent} strokeWidth={1.4} />
                   <Text style={styles.optionLabel}>{label}</Text>
                   <Text style={styles.optionCount}>
                     {full ? 'Full' : `${counts[kind]}/${MAX_PER_KIND}`}
@@ -58,9 +66,6 @@ export function AddItemSheet({visible, counts, onChoose, onClose}: Props) {
               );
             })}
           </View>
-          <Pressable onPress={onClose} hitSlop={12} style={styles.cancel}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </Pressable>
         </Pressable>
       </Pressable>
     </Modal>
@@ -95,8 +100,7 @@ const styles = StyleSheet.create({
   },
   optionFull: {opacity: 0.45},
   optionPressed: {opacity: 0.8},
-  optionLabel: {fontSize: 17, fontWeight: '700', color: theme.ink},
+  optionLabel: {fontSize: 16, fontWeight: '600', color: theme.ink},
   optionCount: {fontSize: 13, color: theme.muted},
-  cancel: {alignSelf: 'center', marginTop: 18},
-  cancelText: {fontSize: 16, color: theme.accent, fontWeight: '600'},
+  close: {position: 'absolute', top: 18, right: 18, zIndex: 1},
 });

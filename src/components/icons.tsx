@@ -59,6 +59,27 @@ export const LibraryIcon = (props: IconProps) => (
   </Icon>
 );
 
+export const CloseIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <Path d="M6 6 L18 18" />
+    <Path d="M18 6 L6 18" />
+  </Icon>
+);
+
+export const PlusIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <Path d="M12 5 V19" />
+    <Path d="M5 12 H19" />
+  </Icon>
+);
+
+export const TrendingIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <Path d="M3 17 L9 11 L13 15 L21 7" />
+    <Path d="M15 7 H21 V13" />
+  </Icon>
+);
+
 const GEAR_TEETH = Array.from({length: 8}, (_, i) => {
   const a = (i * Math.PI) / 4;
   return {

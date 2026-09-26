@@ -5,7 +5,7 @@ import {GarmentCard} from '../components/GarmentCard';
 import {GarmentViewerModal} from '../components/GarmentViewerModal';
 import {ScreenHeader} from '../components/ScreenHeader';
 import {SegmentedControl} from '../components/SegmentedControl';
-import {KIND_LABELS, MAX_PER_KIND, theme} from '../constants';
+import {KIND_LABELS, theme} from '../constants';
 import {useWardrobeContext} from '../state/WardrobeContext';
 import type {Garment} from '../types';
 
@@ -20,7 +20,7 @@ export function LibraryScreen() {
     (width - SIDE_PADDING * 2 - GAP * (COLUMNS - 1)) / COLUMNS,
   );
   const {
-    wardrobe: {garments, loaded, counts, remove},
+    wardrobe: {garments, loaded, remove},
     libraryTab: tab,
     setLibraryTab: setTab,
   } = useWardrobeContext();
@@ -31,7 +31,7 @@ export function LibraryScreen() {
 
   return (
     <View style={[styles.root, {paddingTop: insets.top}]}>
-      <ScreenHeader title="Library" subtitle="Your wardrobe in 3D" showAdd />
+      <ScreenHeader title="Library" subtitle="Your wardrobe" />
 
       <View style={styles.tabs}>
         <SegmentedControl
@@ -39,7 +39,7 @@ export function LibraryScreen() {
           onChange={setTab}
           options={(['shirt', 'pants'] as const).map(kind => ({
             value: kind,
-            label: `${KIND_LABELS[kind].plural} ${counts[kind]}/${MAX_PER_KIND}`,
+            label: KIND_LABELS[kind].plural,
           }))}
         />
       </View>

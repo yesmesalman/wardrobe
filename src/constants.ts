@@ -1,7 +1,7 @@
 import type {Align, GarmentKind, Variant} from './types';
 
 /** How many shirts and how many pants the wardrobe holds. */
-export const MAX_PER_KIND = 20;
+export const MAX_PER_KIND = 5;
 
 export const KIND_LABELS: Record<GarmentKind, {singular: string; plural: string}> =
   {
