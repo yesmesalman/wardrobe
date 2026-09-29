@@ -57,7 +57,14 @@ async function openTab(
   await settle();
 }
 
-test('has Outfit, Library and Settings tabs, with Add item on Outfit and Library', async () => {
+const hasAddButton = (renderer: ReactTestRenderer.ReactTestRenderer) =>
+  renderer.root.findAll(
+    node =>
+      node.props.accessibilityLabel === 'Add item' &&
+      typeof node.props.onPress === 'function',
+  ).length > 0;
+
+test('has Library, Outfit, Trending and Settings tabs, with a centre Add item button', async () => {
   jest.useFakeTimers();
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
@@ -67,15 +74,13 @@ test('has Outfit, Library and Settings tabs, with Add item on Outfit and Library
 
   // Library is the starting tab.
   let text = screenText(renderer);
-  expect(text).toContain('Outfit');
-  expect(text).toContain('Library');
-  expect(text).toContain('Settings');
-  expect(text).toContain('Shirts 0/20');
-  expect(text).toContain('Pants 0/20');
+  expect(text).toContain('Your wardrobe');
+  expect(text).toContain('Shirts');
+  expect(text).toContain('Pants');
   expect(text).toContain('No shirts yet');
-  expect(text).toContain('Add item');
-  // Tab bar order: Outfit sits in the centre.
-  expect(text.endsWith('Library|Outfit|Settings')).toBe(true);
+  // Tab bar order; the round Add item button sits between Outfit and Trending.
+  expect(text.endsWith('Library|Outfit|Trending|Settings')).toBe(true);
+  expect(hasAddButton(renderer)).toBe(true);
 
   await openTab(renderer, 'Outfit');
   text = screenText(renderer);
@@ -83,7 +88,6 @@ test('has Outfit, Library and Settings tabs, with Add item on Outfit and Library
   // Nothing in the Library yet, so both rows are placeholders.
   expect(text).toContain('Add a shirt');
   expect(text).toContain('Add pants');
-  expect(text).toContain('Add item');
 
   jest.useRealTimers();
 });

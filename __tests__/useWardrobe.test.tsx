@@ -52,7 +52,7 @@ const addMany = async (
   }
 };
 
-test('keeps at most 20 shirts and 20 pants, independently', async () => {
+test(`keeps at most ${MAX_PER_KIND} shirts and ${MAX_PER_KIND} pants, independently`, async () => {
   const wardrobe = await renderWardrobe();
 
   await addMany(wardrobe, 'shirt', MAX_PER_KIND);
@@ -70,7 +70,7 @@ test('keeps at most 20 shirts and 20 pants, independently', async () => {
       photoBase64: 'cGhvdG8=',
       thumbBase64: 'dGh1bWI=',
     }),
-  ).rejects.toThrow('20');
+  ).rejects.toThrow(String(MAX_PER_KIND));
   expect(storage.saveGarmentFiles).toHaveBeenCalledTimes(MAX_PER_KIND);
 
   await addMany(wardrobe, 'pants', MAX_PER_KIND);
