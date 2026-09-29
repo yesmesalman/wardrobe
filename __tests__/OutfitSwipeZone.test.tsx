@@ -6,10 +6,16 @@ import React from 'react';
 import {Text} from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import {
+  dragOffset,
+  FLICK_SPEED,
   OutfitSwipeZone,
   stepIndex,
   SWIPE_DISTANCE,
 } from '../src/components/OutfitSwipeZone';
+
+jest.mock('../src/storage/wardrobeStorage', () => ({
+  fileUri: (name: string) => `file:///${name}`,
+}));
 
 describe('stepIndex', () => {
   test('a swipe left goes to the next item, a swipe right to the previous', () => {
@@ -25,6 +31,29 @@ describe('stepIndex', () => {
   test('ignores short drags', () => {
     expect(stepIndex(2, SWIPE_DISTANCE - 1, 5)).toBe(2);
     expect(stepIndex(2, -(SWIPE_DISTANCE - 1), 5)).toBe(2);
+  });
+
+  test('a short but quick flick still changes the item', () => {
+    expect(stepIndex(2, -20, 5, -FLICK_SPEED)).toBe(3);
+    expect(stepIndex(2, 20, 5, FLICK_SPEED)).toBe(1);
+  });
+
+  test('a flick back against the drag does not count', () => {
+    expect(stepIndex(2, -20, 5, FLICK_SPEED)).toBe(2);
+  });
+});
+
+describe('dragOffset', () => {
+  test('follows the finger when there is another item that way', () => {
+    expect(dragOffset(1, -80, 5, 390)).toBe(-80);
+    expect(dragOffset(1, 80, 5, 390)).toBe(80);
+  });
+
+  test('resists past the first and last item, never beyond a third of the width', () => {
+    const pulled = dragOffset(0, 80, 5, 390);
+    expect(pulled).toBeGreaterThan(0);
+    expect(pulled).toBeLessThan(80);
+    expect(dragOffset(4, -1000, 5, 390)).toBeGreaterThan(-130);
   });
 });
 

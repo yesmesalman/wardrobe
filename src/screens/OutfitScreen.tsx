@@ -1,8 +1,12 @@
-import React, {useMemo, useState} from 'react';
+import React, {useMemo, useRef, useState} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {trigger} from 'react-native-haptic-feedback';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {OutfitScene, type OutfitLayout} from '../components/OutfitScene';
+import {
+  OutfitScene,
+  type OutfitLayout,
+  type OutfitSceneHandle,
+} from '../components/OutfitScene';
 import {OutfitSwipeZone} from '../components/OutfitSwipeZone';
 import {ScreenHeader} from '../components/ScreenHeader';
 import {theme} from '../constants';
@@ -38,6 +42,8 @@ export function OutfitScreen() {
   const [shirtSlide, setShirtSlide] = useState(0);
   const [pantsSlide, setPantsSlide] = useState(0);
   const [layout, setLayout] = useState(DEFAULT_LAYOUT);
+  // The garment being swiped follows the finger inside the scene.
+  const scene = useRef<OutfitSceneHandle>(null);
   const {split} = layout;
 
   const shirts = useMemo(
@@ -77,6 +83,7 @@ export function OutfitScreen() {
       <ScreenHeader title="Outfit" subtitle="Swipe to mix and match" />
       <View style={styles.panel}>
         <OutfitScene
+          ref={scene}
           shirt={shirt}
           pants={trousers}
           shirtSlide={shirtSlide}
@@ -90,6 +97,8 @@ export function OutfitScreen() {
           count={shirts.length}
           index={shirtAt}
           onIndexChange={changeShirt}
+          onDrag={dx => scene.current?.drag('shirt', dx)}
+          onDragEnd={changed => scene.current?.endDrag('shirt', changed)}
           previous={neighbours(shirts, shirtAt, -1)}
           next={neighbours(shirts, shirtAt, 1)}
           centre={layout.shirtCentre / split}
@@ -102,6 +111,8 @@ export function OutfitScreen() {
           count={pants.length}
           index={pantsAt}
           onIndexChange={changePants}
+          onDrag={dx => scene.current?.drag('pants', dx)}
+          onDragEnd={changed => scene.current?.endDrag('pants', changed)}
           previous={neighbours(pants, pantsAt, -1)}
           next={neighbours(pants, pantsAt, 1)}
           centre={(layout.pantsCentre - split) / (1 - split)}

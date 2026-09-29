@@ -18,3 +18,6 @@ jest.mock('react-native-svg', () => {
     Line: passthrough('Line'),
   };
 });
+
+// Ships untranspiled TypeScript and needs a native module; no buzzing in tests.
+jest.mock('react-native-haptic-feedback', () => ({trigger: jest.fn()}));

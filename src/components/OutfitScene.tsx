@@ -1,9 +1,16 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {
+  Ref,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import {ActivityIndicator, StyleSheet, View, ViewStyle} from 'react-native';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
 import {theme} from '../constants';
 import {readFileBase64} from '../storage/wardrobeStorage';
-import type {Garment} from '../types';
+import type {Garment, GarmentKind} from '../types';
 import {SCENE_HTML} from '../webview/sceneHtml';
 
 /** Where the waist and the middle of each garment fall, as fractions of the view's height. */
@@ -13,7 +20,19 @@ export interface OutfitLayout {
   pantsCentre: number;
 }
 
+/** Moves a garment with the user's finger while they swipe. */
+export interface OutfitSceneHandle {
+  /** The garment follows the finger, `dx` points from its place. */
+  drag: (part: GarmentKind, dx: number) => void;
+  /**
+   * The finger has lifted. Unless the swipe `changed` the garment (the new one
+   * then carries on from here), it springs back.
+   */
+  endDrag: (part: GarmentKind, changed: boolean) => void;
+}
+
 interface Props {
+  ref?: Ref<OutfitSceneHandle>;
   shirt: Garment | null;
   pants: Garment | null;
   /**
@@ -66,6 +85,7 @@ const spec = (
  * scene is a fixed front view; the app puts swipe zones on top of it.
  */
 export function OutfitScene({
+  ref,
   shirt,
   pants,
   shirtSlide = 0,
@@ -78,6 +98,43 @@ export function OutfitScene({
   const [shown, setShown] = useState(false);
   const [shirtImage, setShirtImage] = useState<Loaded | null>(null);
   const [pantsImage, setPantsImage] = useState<Loaded | null>(null);
+
+  // Drags arrive faster than frames; send only the latest, once per frame.
+  const drags = useRef<Partial<Record<GarmentKind, number>>>({});
+  const dragFrame = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      dragFrame.current !== null && cancelAnimationFrame(dragFrame.current);
+    },
+    [],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      drag: (part, dx) => {
+        drags.current[part] = dx;
+        if (dragFrame.current === null) {
+          dragFrame.current = requestAnimationFrame(() => {
+            dragFrame.current = null;
+            const code = Object.entries(drags.current)
+              .map(([p, x]) => `window.__dragOutfit('${p}',${x});`)
+              .join('');
+            drags.current = {};
+            code && web.current?.injectJavaScript(`${code}true;`);
+          });
+        }
+      },
+      endDrag: (part, changed) => {
+        // A late drag would pull the garment (or its replacement) off again.
+        delete drags.current[part];
+        if (!changed) {
+          web.current?.injectJavaScript(`window.__releaseOutfit('${part}');true;`);
+        }
+      },
+    }),
+    [],
+  );
 
   // Read the images for whichever garments are on screen.
   useEffect(() => {

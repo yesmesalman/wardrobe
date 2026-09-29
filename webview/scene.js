@@ -15,6 +15,8 @@
  *   __setColor(hex)                           fabric colour
  *   __setOutfit({shirt, pants})               show a shirt over pants, as if worn
  *       each: null or {id, variant, photo, mode, color, align, slide}
+ *   __dragOutfit(part, px)                    move 'shirt' / 'pants' with a finger
+ *   __releaseOutfit(part)                     let a dragged garment spring back
  *   __setAutoRotate(bool)
  *   __setView('3d' | 'align')                 3D view or 2D alignment view
  *   __setAlign({sx, sy, ox, oy}), __zoomAlign(factor), __resetAlign()
@@ -152,6 +154,8 @@ const OUTFIT = {
   // Garments slide this far sideways, in this many ms, when swapped.
   slideDistance: 1.4,
   slideMs: 300,
+  // A dragged garment that is let go without changing springs back this fast.
+  returnMs: 220,
 };
 
 function loadModel(variant) {
@@ -281,23 +285,31 @@ function disposeGarment() {
   }
 }
 
-/** Jumps any slide in progress to its end (removing garments that left). */
-function finishTransitions() {
-  transitions.splice(0).forEach(t => {
-    t.g.group.position.x = t.to;
-    t.done && t.done();
-  });
+/**
+ * Jumps slides in progress to their end (removing garments that left): all of
+ * them, or only those of one part of the outfit.
+ */
+function finishTransitions(part) {
+  for (let i = transitions.length - 1; i >= 0; i--) {
+    const t = transitions[i];
+    if (!part || t.part === part) {
+      transitions.splice(i, 1);
+      t.g.group.position.x = t.to;
+      t.done && t.done();
+    }
+  }
 }
 
-function slide(g, from, to, done) {
+function slide(g, from, to, {part, done, duration = OUTFIT.slideMs} = {}) {
   g.group.position.x = from;
   transitions.push({
     g,
+    part,
     from,
     to,
     done,
     start: performance.now(),
-    duration: OUTFIT.slideMs,
+    duration,
   });
 }
 
@@ -447,6 +459,11 @@ async function setOutfit(specs) {
       const {part} = item;
       const old = outfit[part];
       if (item.keep) {
+        // Left where a drag stopped (the change it asked for never came).
+        const x = old.group.position.x;
+        if (x) {
+          slide(old, x, 0, {part, duration: OUTFIT.returnMs});
+        }
         return;
       }
       if (!item.spec) {
@@ -476,8 +493,19 @@ async function setOutfit(specs) {
 
       const dir = Math.sign(item.spec.slide || 0);
       if (old && dir) {
-        slide(old, 0, -dir * OUTFIT.slideDistance, () => disposeOf(old));
-        slide(g, dir * OUTFIT.slideDistance, 0);
+        // Carry on from wherever a drag left the old garment, as one strip:
+        // the new one follows a slide's width behind it, and the rest of the
+        // way takes a matching share of the time.
+        const from = old.group.position.x;
+        const left = Math.abs(from + dir * OUTFIT.slideDistance);
+        const duration =
+          OUTFIT.slideMs * Math.max(0.4, left / OUTFIT.slideDistance);
+        slide(old, from, -dir * OUTFIT.slideDistance, {
+          part,
+          duration,
+          done: () => disposeOf(old),
+        });
+        slide(g, from + dir * OUTFIT.slideDistance, 0, {part, duration});
       } else if (old) {
         disposeOf(old);
       }
@@ -486,6 +514,43 @@ async function setOutfit(specs) {
     post({type: 'loaded'});
   } catch (e) {
     post({type: 'error', message: String(e && e.message ? e.message : e)});
+  }
+}
+
+/** World units per screen pixel at the outfit's depth. */
+function outfitPixel() {
+  const half = Math.tan((FOV * Math.PI) / 360);
+  const visible = 2 * half * outfitCam.distance * camera.aspect;
+  return visible / (window.innerWidth || 1);
+}
+
+/**
+ * Moves one garment of the outfit sideways with the user's finger, `px` screen
+ * pixels from its place (no further than a slide, so the garment that follows
+ * it in never has to back up).
+ */
+function dragOutfit(part, px) {
+  const g = state.outfit && outfit[part];
+  if (!g) {
+    return;
+  }
+  finishTransitions(part);
+  const x = px * outfitPixel();
+  g.group.position.x = Math.max(
+    -OUTFIT.slideDistance,
+    Math.min(OUTFIT.slideDistance, x),
+  );
+}
+
+/** Lets a dragged garment that did not change spring back into place. */
+function releaseOutfit(part) {
+  const g = state.outfit && outfit[part];
+  if (!g || transitions.some(t => t.g === g)) {
+    return;
+  }
+  const x = g.group.position.x;
+  if (x) {
+    slide(g, x, 0, {part, duration: OUTFIT.returnMs});
   }
 }
 
@@ -1138,6 +1203,8 @@ function snapshot(id) {
 
 window.__setGarment = setGarment;
 window.__setOutfit = setOutfit;
+window.__dragOutfit = dragOutfit;
+window.__releaseOutfit = releaseOutfit;
 window.__setColor = setColor;
 window.__setAutoRotate = value => {
   state.autoRotate = value;
