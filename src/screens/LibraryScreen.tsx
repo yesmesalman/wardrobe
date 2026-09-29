@@ -60,7 +60,7 @@ export function LibraryScreen() {
                 No {labels.plural.toLowerCase()} yet
               </Text>
               <Text style={styles.emptyText}>
-                Tap “Add item” at the top right to photograph one and see it in 3D.
+                Tap the + button below to photograph one and see it in 3D.
               </Text>
             </View>
           ) : undefined
