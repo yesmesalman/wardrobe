@@ -187,15 +187,15 @@ function buildShirt({long = false} = {}) {
   const ROWS = 48;
   const TOP = 0.725;
 
-  // [y, half width, half depth]
+  // [y, half width, half depth]. A boxy tee: straight sides from the hem up
+  // to the armpit, then shoulders sloping about 30 degrees up to the collar.
   const torso = [
-    [0.0, 0.214, 0.099],
-    [0.06, 0.212, 0.097],
-    [0.3, 0.2, 0.092],
-    [0.48, 0.223, 0.104],
-    [0.6, 0.244, 0.1],
-    [0.66, 0.19, 0.08],
-    [0.71, 0.098, 0.063],
+    [0.0, 0.2, 0.096],
+    [0.42, 0.2, 0.098],
+    [0.6, 0.226, 0.1],
+    [0.645, 0.232, 0.092],
+    [0.685, 0.16, 0.078],
+    [0.712, 0.106, 0.064],
     [TOP, 0.09, 0.06],
   ];
 
@@ -229,21 +229,29 @@ function buildShirt({long = false} = {}) {
   const neck = torsoRows[ROWS - 1];
   mesh.addLoft(ringTube(neck, 0.009), {closedRows: true});
 
-  // Short sleeves.
-  const tilt = ((long ? 46 : 38) * Math.PI) / 180;
+  // Sleeves hang from the shoulder point, angled out and down. Short ones
+  // are a wide, flat tube whose hem ends level with the armpit.
+  const tilt = ((long ? 46 : 55) * Math.PI) / 180;
   const dir = [Math.cos(tilt), -Math.sin(tilt), 0];
   const up = [Math.sin(tilt), Math.cos(tilt), 0];
+  const shoulder = [0.236, 0.649];
   const SLEEVE_ROWS = long ? 30 : 16;
   const SLEEVE_RING = 40;
   [1, -1].forEach(side => {
-    const root = [side * 0.16, 0.588, 0];
-    const length = long ? 0.6 : 0.27;
+    const r0 = 0.086;
+    // The sleeve's top edge starts at the shoulder point.
+    const root = [
+      side * (shoulder[0] - up[0] * r0),
+      shoulder[1] - up[1] * r0,
+      0,
+    ];
+    const length = long ? 0.6 : 0.2;
     const rows = [];
     for (let r = 0; r < SLEEVE_ROWS; r++) {
       const t = r / (SLEEVE_ROWS - 1);
-      // Long sleeves taper to a snug cuff; short ones stay loose.
-      const ru = 0.088 - (long ? 0.04 : 0.02) * smoothstep(t);
-      const rz = 0.086 - (long ? 0.038 : 0.02) * smoothstep(t);
+      // Long sleeves taper to a snug cuff; short ones flare slightly.
+      const ru = r0 - (long ? 0.038 : -0.004) * smoothstep(t);
+      const rz = (long ? 0.086 : 0.066) - (long ? 0.038 : 0.008) * smoothstep(t);
       const c = [
         root[0] + side * dir[0] * length * t,
         root[1] + dir[1] * length * t,
