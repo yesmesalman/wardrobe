@@ -90,3 +90,12 @@ export async function deleteGarmentFiles(garment: Garment): Promise<void> {
     }),
   );
 }
+
+/** Deletes every stored garment: the index and all photos, cut-outs and snapshots. */
+export async function deleteAllData(): Promise<void> {
+  for (const path of [garmentsDir(), indexPath()]) {
+    if (await exists(path)) {
+      await unlink(path);
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {MAX_PER_KIND} from '../constants';
 import {
+  deleteAllData,
   deleteGarmentFiles,
   loadGarments,
   saveGarmentFiles,
@@ -84,5 +85,11 @@ export function useWardrobe() {
     setGarments(prev => prev.filter(g => g.id !== garment.id));
   }, []);
 
-  return {garments, loaded, counts, isFull, add, remove};
+  /** Removes every garment and all of their files. */
+  const reset = useCallback(async () => {
+    await deleteAllData();
+    setGarments([]);
+  }, []);
+
+  return {garments, loaded, counts, isFull, add, remove, reset};
 }

@@ -99,3 +99,9 @@ export const SettingsIcon = (props: IconProps) => (
     ))}
   </Icon>
 );
+
+export const ChevronIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <Path d="M9 5 L16 12 L9 19" />
+  </Icon>
+);

@@ -15,6 +15,7 @@ jest.mock('../src/storage/wardrobeStorage', () => ({
     Promise.resolve({photoFile: `${id}.jpg`, thumbFile: `${id}-thumb.jpg`}),
   ),
   deleteGarmentFiles: jest.fn(() => Promise.resolve()),
+  deleteAllData: jest.fn(() => Promise.resolve()),
 }));
 
 type Wardrobe = ReturnType<typeof useWardrobe>;
@@ -94,4 +95,18 @@ test('removing a garment frees a slot and deletes its photo', async () => {
   expect(storage.saveGarments).toHaveBeenLastCalledWith(
     expect.not.arrayContaining([garment]),
   );
+});
+
+test('reset removes every garment and all stored data', async () => {
+  const wardrobe = await renderWardrobe();
+  await addMany(wardrobe, 'shirt', 2);
+  await addMany(wardrobe, 'pants', 1);
+  expect(wardrobe.current.garments).toHaveLength(3);
+
+  await ReactTestRenderer.act(async () => {
+    await wardrobe.current.reset();
+  });
+  expect(storage.deleteAllData).toHaveBeenCalled();
+  expect(wardrobe.current.garments).toHaveLength(0);
+  expect(wardrobe.current.counts).toEqual({shirt: 0, pants: 0});
 });

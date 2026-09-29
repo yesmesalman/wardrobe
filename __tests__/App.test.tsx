@@ -7,6 +7,7 @@ import {Text} from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
 import {SettingsScreen} from '../src/screens/SettingsScreen';
+import {WardrobeProvider} from '../src/state/WardrobeContext';
 
 jest.mock('react-native-safe-area-context', () =>
   require('react-native-safe-area-context/jest/mock').default,
@@ -20,6 +21,7 @@ jest.mock('../src/storage/wardrobeStorage', () => ({
   saveGarmentFiles: jest.fn(),
   readFileBase64: jest.fn(),
   deleteGarmentFiles: jest.fn(),
+  deleteAllData: jest.fn(() => Promise.resolve()),
   fileUri: jest.fn((name: string) => `file:///garments/${name}`),
 }));
 jest.mock('../src/hooks/pickPhoto', () => ({pickPhoto: jest.fn()}));
@@ -86,12 +88,17 @@ test('has Outfit, Library and Settings tabs, with Add item on Outfit and Library
   jest.useRealTimers();
 });
 
-test('Settings is empty and has no Add item button', async () => {
+test('Settings has Reset Data and no Add item button', async () => {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<SettingsScreen />);
+    renderer = ReactTestRenderer.create(
+      <WardrobeProvider>
+        <SettingsScreen />
+      </WardrobeProvider>,
+    );
   });
   const text = screenText(renderer);
   expect(text).toContain('Settings');
+  expect(text).toContain('Reset Data');
   expect(text).not.toContain('Add item');
 });
