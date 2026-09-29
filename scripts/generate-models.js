@@ -11,6 +11,11 @@
  * Every model is a single mesh (node "Shirt" / "Pants") with one material
  * ("Fabric") and a `decal` entry in the node extras that tells the app where
  * a user's photo is projected onto the garment.
+ *
+ * The shirts are shaped like a flat-lay photo (sleeves spread), which is what
+ * the user's photo is fitted to, and carry one morph target, "rest", that
+ * lets the sleeves hang at the sides like arms at rest. The app shows the
+ * rest pose and keeps projecting the photo through the flat-lay shape.
  */
 const {Buffer} = require('buffer');
 const fs = require('fs');
@@ -180,9 +185,78 @@ function ringTube(points, radius, segments = 8) {
 // Shirt
 // ---------------------------------------------------------------------------
 
+/** Resting arms hang this far out from vertical. */
+const REST_ANGLE = (15 * Math.PI) / 180;
+
+/**
+ * Centre line of a right sleeve (x > 0) hanging at rest: it leaves the
+ * armhole over the shoulder, curves down past the armpit and then hangs
+ * `hang` further, REST_ANGLE out from vertical. Returns `count` points
+ * spaced evenly along it, each with the line's direction there.
+ */
+function restingSleeve(count, hang) {
+  const root = [0.16, 0.588];
+  const out = [Math.cos(0.35), -Math.sin(0.35)]; // about 20° below level
+  const armpit = [0.3, 0.5];
+  const down = [Math.sin(REST_ANGLE), -Math.cos(REST_ANGLE)];
+  const K = 0.07;
+  const c1 = [root[0] + out[0] * K, root[1] + out[1] * K];
+  const c2 = [armpit[0] - down[0] * K, armpit[1] - down[1] * K];
+
+  // A dense polyline: a cubic curve over the shoulder, then the hanging part.
+  const line = [];
+  const STEPS = 60;
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS;
+    const u = 1 - t;
+    line.push(
+      [0, 1].map(
+        k =>
+          u * u * u * root[k] +
+          3 * u * u * t * c1[k] +
+          3 * u * t * t * c2[k] +
+          t * t * t * armpit[k],
+      ),
+    );
+  }
+  for (let i = 1; i <= STEPS; i++) {
+    const s = (hang * i) / STEPS;
+    line.push([armpit[0] + down[0] * s, armpit[1] + down[1] * s]);
+  }
+
+  // Resample by arc length.
+  const along = [0];
+  for (let i = 1; i < line.length; i++) {
+    along.push(
+      along[i - 1] +
+        Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]),
+    );
+  }
+  const total = along[along.length - 1];
+  const at = d => {
+    let i = 1;
+    while (i < line.length - 1 && along[i] < d) {
+      i++;
+    }
+    const k = (d - along[i - 1]) / (along[i] - along[i - 1] || 1);
+    return [0, 1].map(j => line[i - 1][j] + (line[i][j] - line[i - 1][j]) * k);
+  };
+  const result = [];
+  for (let r = 0; r < count; r++) {
+    const d = (r / (count - 1)) * total;
+    const a = at(Math.max(0, d - 0.005));
+    const b = at(Math.min(total, d + 0.005));
+    const dir = normalize([b[0] - a[0], b[1] - a[1], 0]);
+    result.push({centre: at(d), dir: [dir[0], dir[1]]});
+  }
+  return result;
+}
+
 /** Short-sleeve tee, or a long-sleeve shirt with sleeves angled down to the cuff. */
 function buildShirt({long = false} = {}) {
   const mesh = new Mesh();
+  // The same garment with the sleeves hanging at rest (vertex for vertex).
+  const rest = new Mesh();
   const RING = 72;
   const ROWS = 48;
   const TOP = 0.725;
@@ -224,21 +298,26 @@ function buildShirt({long = false} = {}) {
     torsoRows.push(ring);
   }
   mesh.addLoft(torsoRows);
+  rest.addLoft(torsoRows);
 
   // Ribbed collar following the neck opening.
   const neck = torsoRows[ROWS - 1];
   mesh.addLoft(ringTube(neck, 0.009), {closedRows: true});
+  rest.addLoft(ringTube(neck, 0.009), {closedRows: true});
 
-  // Short sleeves.
+  // Sleeves, spread as in a flat-lay photo.
   const tilt = ((long ? 46 : 38) * Math.PI) / 180;
   const dir = [Math.cos(tilt), -Math.sin(tilt), 0];
   const up = [Math.sin(tilt), Math.cos(tilt), 0];
   const SLEEVE_ROWS = long ? 30 : 16;
   const SLEEVE_RING = 40;
+  // At rest a long sleeve reaches down to the hem; a short one above the elbow.
+  const resting = restingSleeve(SLEEVE_ROWS, long ? 0.48 : 0.13);
   [1, -1].forEach(side => {
     const root = [side * 0.16, 0.588, 0];
     const length = long ? 0.6 : 0.27;
     const rows = [];
+    const restRows = [];
     for (let r = 0; r < SLEEVE_ROWS; r++) {
       const t = r / (SLEEVE_ROWS - 1);
       // Long sleeves taper to a snug cuff; short ones stay loose.
@@ -249,7 +328,10 @@ function buildShirt({long = false} = {}) {
         root[1] + dir[1] * length * t,
         0,
       ];
+      const {centre, dir: hang} = resting[r];
+      const restUp = [-hang[1], hang[0]];
       const ring = [];
+      const restRing = [];
       for (let i = 0; i < SLEEVE_RING; i++) {
         const theta = (i / SLEEVE_RING) * TAU;
         const [a, b] = superEllipse(theta, ru, rz, 2.2);
@@ -259,15 +341,24 @@ function buildShirt({long = false} = {}) {
           c[1] + up[1] * (a + fold),
           b + fold,
         ]);
+        restRing.push([
+          side * (centre[0] + restUp[0] * (a + fold)),
+          centre[1] + restUp[1] * (a + fold),
+          b + fold,
+        ]);
       }
       rows.push(ring);
+      restRows.push(restRing);
     }
     mesh.addLoft(rows);
+    rest.addLoft(restRows);
   });
 
   const mid = mesh.center();
+  rest.positions = rest.positions.map(p => sub(p, mid));
   return {
     mesh,
+    rest,
     name: 'Shirt',
     // Chest print area, in the centred coordinate space of the model.
     decal: {
@@ -395,24 +486,45 @@ function buildPants({shorts = false} = {}) {
 // GLB writer
 // ---------------------------------------------------------------------------
 
-function toGLB({mesh, name, decal}) {
-  const positions = new Float32Array(mesh.positions.flat());
-  const normals = new Float32Array(mesh.normals.flat());
-  const indices = new Uint32Array(mesh.indices);
-
+const bounds = points => {
   const min = [Infinity, Infinity, Infinity];
   const max = [-Infinity, -Infinity, -Infinity];
-  mesh.positions.forEach(p =>
+  points.forEach(p =>
     p.forEach((v, i) => {
       min[i] = Math.min(min[i], v);
       max[i] = Math.max(max[i], v);
     }),
   );
+  return {min, max};
+};
+
+function toGLB({mesh, rest, name, decal}) {
+  const positions = new Float32Array(mesh.positions.flat());
+  const normals = new Float32Array(mesh.normals.flat());
+  const indices = new Uint32Array(mesh.indices);
+  const {min, max} = bounds(mesh.positions);
 
   const posBytes = Buffer.from(positions.buffer);
   const nrmBytes = Buffer.from(normals.buffer);
   const idxBytes = Buffer.from(indices.buffer);
-  const bin = Buffer.concat([posBytes, nrmBytes, idxBytes]);
+
+  // The "rest" morph target: how far each vertex and normal moves.
+  let restDeltas = null;
+  if (rest) {
+    const dp = rest.positions.map((p, i) => sub(p, mesh.positions[i]));
+    const dn = rest.normals.map((n, i) => sub(n, mesh.normals[i]));
+    restDeltas = {
+      bounds: bounds(dp),
+      pos: Buffer.from(new Float32Array(dp.flat()).buffer),
+      nrm: Buffer.from(new Float32Array(dn.flat()).buffer),
+    };
+  }
+  const bin = Buffer.concat(
+    [posBytes, nrmBytes, idxBytes].concat(
+      restDeltas ? [restDeltas.pos, restDeltas.nrm] : [],
+    ),
+  );
+  const restOffset = posBytes.length + nrmBytes.length + idxBytes.length;
 
   const gltf = {
     asset: {version: '2.0', generator: 'wardrobe/scripts/generate-models.js'},
@@ -423,8 +535,14 @@ function toGLB({mesh, name, decal}) {
       {
         name,
         primitives: [
-          {attributes: {POSITION: 0, NORMAL: 1}, indices: 2, material: 0},
+          {
+            attributes: {POSITION: 0, NORMAL: 1},
+            indices: 2,
+            material: 0,
+            ...(restDeltas ? {targets: [{POSITION: 3, NORMAL: 4}]} : {}),
+          },
         ],
+        ...(restDeltas ? {weights: [1], extras: {targetNames: ['rest']}} : {}),
       },
     ],
     materials: [
@@ -454,6 +572,23 @@ function toGLB({mesh, name, decal}) {
         type: 'VEC3',
       },
       {bufferView: 2, componentType: 5125, count: indices.length, type: 'SCALAR'},
+      ...(restDeltas
+        ? [
+            {
+              bufferView: 3,
+              componentType: 5126,
+              count: mesh.positions.length,
+              type: 'VEC3',
+              ...restDeltas.bounds,
+            },
+            {
+              bufferView: 4,
+              componentType: 5126,
+              count: mesh.normals.length,
+              type: 'VEC3',
+            },
+          ]
+        : []),
     ],
     bufferViews: [
       {buffer: 0, byteOffset: 0, byteLength: posBytes.length, target: 34962},
@@ -469,6 +604,22 @@ function toGLB({mesh, name, decal}) {
         byteLength: idxBytes.length,
         target: 34963,
       },
+      ...(restDeltas
+        ? [
+            {
+              buffer: 0,
+              byteOffset: restOffset,
+              byteLength: restDeltas.pos.length,
+              target: 34962,
+            },
+            {
+              buffer: 0,
+              byteOffset: restOffset + restDeltas.pos.length,
+              byteLength: restDeltas.nrm.length,
+              target: 34962,
+            },
+          ]
+        : []),
     ],
     buffers: [{byteLength: bin.length}],
   };
