@@ -157,32 +157,6 @@ const OUTFIT = {
   returnMs: 220,
 };
 
-/** Bounds of a model with its "rest" morph target (if any) fully applied. */
-function restBox(geometry) {
-  const position = geometry.attributes.position;
-  const delta =
-    geometry.morphAttributes.position && geometry.morphAttributes.position[0];
-  const box = new THREE.Box3();
-  const v = new THREE.Vector3();
-  for (let i = 0; i < position.count; i++) {
-    v.fromBufferAttribute(position, i);
-    if (delta) {
-      v.x += delta.getX(i);
-      v.y += delta.getY(i);
-      v.z += delta.getZ(i);
-    }
-    box.expandByPoint(v);
-  }
-  return box;
-}
-
-/** How far a garment's sleeves hang at rest: 1 = at rest, 0 = the flat-lay. */
-function setPose(g, weight) {
-  if (g && g.mesh.morphTargetInfluences) {
-    g.mesh.morphTargetInfluences[0] = weight;
-  }
-}
-
 function loadModel(variant) {
   if (models[variant]) {
     return Promise.resolve(models[variant]);
@@ -198,21 +172,16 @@ function loadModel(variant) {
         gltf.scene.traverse(o => {
           mesh = mesh || (o.isMesh ? o : null);
         });
-        // The model's own shape is the flat-lay the photo is fitted to; the
-        // shirts' "rest" morph target lets the sleeves hang (see createGarment).
-        const box = new THREE.Box3().setFromBufferAttribute(
-          mesh.geometry.attributes.position,
-        );
+        mesh.geometry.computeBoundingBox();
+        const box = mesh.geometry.boundingBox;
         const dims = box.getSize(new THREE.Vector3());
         const centre = box.getCenter(new THREE.Vector3());
-        const shown = restBox(mesh.geometry).getSize(new THREE.Vector3());
         models[variant] = {
           geometry: mesh.geometry,
           anchor: mesh.userData.decal,
-          // As shown, at rest. Yaw changes the visible width, so frame the
-          // wider horizontal side.
-          size: {width: Math.max(shown.x, shown.z), height: dims.y},
-          // Front-on extent of the flat-lay, used to fit a photo over it.
+          // Yaw changes the visible width, so frame the wider horizontal side.
+          size: {width: Math.max(dims.x, dims.z), height: dims.y},
+          // Front-on extent, used to fit a photo over the model.
           bbox: {cx: centre.x, cy: centre.y, W: dims.x, H: dims.y},
         };
         resolve(models[variant]);
@@ -387,9 +356,6 @@ function createGarment(model, texture, mode, color, align) {
   }
   const mesh = new THREE.Mesh(model.geometry, material);
   group.add(mesh);
-  // Shown with the sleeves hanging at rest. The fit shader still projects the
-  // photo through the flat-lay shape (the unmorphed positions), so it stays
-  // on the sleeves wherever they hang.
 
   if (texture && !fit) {
     // Print mode: project the photo onto the garment's print area, keeping
@@ -415,17 +381,7 @@ function createGarment(model, texture, mode, color, align) {
       ),
     );
   }
-  const g = {
-    group,
-    mesh,
-    material,
-    uniforms,
-    texture: fit ? texture : null,
-    model,
-    pose: 1,
-  };
-  setPose(g, 1);
-  return g;
+  return {group, material, uniforms, texture: fit ? texture : null, model};
 }
 
 async function setGarment({variant, photo, mode, align}) {
@@ -453,7 +409,6 @@ async function setGarment({variant, photo, mode, align}) {
     fitCamera();
     applyAlign();
     applyView();
-    setPose(garment, garment.pose); // no glide into the first pose
     post({type: 'loaded'});
   } catch (e) {
     post({type: 'error', message: String(e && e.message ? e.message : e)});
@@ -630,8 +585,6 @@ function applyView() {
   if (garment.uniforms) {
     garment.uniforms.uMix.value = aligning ? 0 : 1;
   }
-  // The photo is lined up against the flat-lay; the sleeves glide there.
-  garment.pose = aligning ? 0 : 1;
   garment.material.color.set(aligning ? ALIGN_COLOR : state.color);
   alignPlane.visible = aligning;
   if (aligning) {
@@ -692,15 +645,11 @@ function fitCamera() {
     const width = outfit.shirt
       ? outfit.shirt.model.size.width
       : OUTFIT.defaultWidth;
+    outfitCam.tCentre = (top + bottom) / 2;
     outfitCam.tDistance = Math.max(
       ((top - bottom) * OUTFIT.heightMargin) / (2 * half),
       (width * OUTFIT.widthMargin) / (2 * half * camera.aspect),
     );
-    // Keep the neckline just under the header: when a wide shirt makes the
-    // figure smaller, the room it frees goes below the pants, not above.
-    const view = outfitCam.tDistance * half; // half the visible height
-    const air = (OUTFIT.heightMargin - 1) / OUTFIT.heightMargin; // of the height
-    outfitCam.tCentre = top + view * air - view;
     if (outfitCam.snap) {
       outfitCam.distance = outfitCam.tDistance;
       outfitCam.centre = outfitCam.tCentre;
@@ -758,10 +707,6 @@ function frame(now) {
   }
   spinner.rotation.y = aligning || state.outfit ? 0 : state.yaw;
   stepTransitions(now);
-  if (garment && garment.mesh.morphTargetInfluences) {
-    const w = garment.mesh.morphTargetInfluences[0];
-    setPose(garment, w + (garment.pose - w) * (1 - Math.exp(-delta * 10)));
-  }
   if (state.outfit) {
     const k = 1 - Math.exp(-delta * 9);
     outfitCam.distance += (outfitCam.tDistance - outfitCam.distance) * k;
@@ -1238,7 +1183,6 @@ function snapshot(id) {
       applyView();
       post({type: 'view', view: '3d'});
     }
-    setPose(garment, 1); // not caught mid-glide
     const previousYaw = spinner.rotation.y;
     renderer.setPixelRatio(1);
     renderer.setSize(SNAPSHOT.width, SNAPSHOT.height, false);
