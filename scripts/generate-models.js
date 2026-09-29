@@ -187,38 +187,69 @@ function ringTube(points, radius, segments = 8) {
 
 /** Resting arms hang this far out from vertical: almost straight, close to the body. */
 const REST_ANGLE = (3 * Math.PI) / 180;
-/** Sleeves at rest are this much slimmer than in the flat-lay, like a worn tee. */
-const REST_SLIM = 0.7;
-/**
- * Top of the resting sleeve: the rounded shoulder point. It overlaps the end
- * of the shoulder slope, so the outline runs from the collar over the
- * shoulder and down the arm.
- */
-const SHOULDER = [0.25, 0.655];
 
 /**
- * A right sleeve (x > 0) hanging at rest, as `count` rows from the shoulder
- * point down to the hem, `length` long. Each row has its centre, the
- * direction of the arm there and how open it is (0 at the top, 1 once the
- * rounded cap has widened to the full sleeve). Rows crowd towards the top so
- * the cap is smooth.
+ * Centre line of a right sleeve (x > 0) hanging at rest: it leaves the
+ * armhole over the shoulder, curves down past the armpit and then hangs
+ * `hang` further, REST_ANGLE out from vertical. Returns `count` points
+ * spaced evenly along it, each with the line's direction there.
  */
-function restingSleeve(count, length, cap) {
+function restingSleeve(count, hang) {
+  const root = [0.16, 0.588];
+  const out = [Math.cos(0.35), -Math.sin(0.35)]; // about 20° below level
+  const armpit = [0.29, 0.5];
   const down = [Math.sin(REST_ANGLE), -Math.cos(REST_ANGLE)];
-  const rows = [];
-  for (let r = 0; r < count; r++) {
-    const t = r / (count - 1);
-    const s = length * t ** 1.6;
-    // A half-dome: open by sqrt(1 - (1 - s / cap)^2) until it is `cap` deep.
-    const k = Math.min(1, s / cap);
-    rows.push({
-      centre: [SHOULDER[0] + down[0] * s, SHOULDER[1] + down[1] * s],
-      dir: down,
-      open: Math.sqrt(1 - (1 - k) ** 2),
-      t: s / length,
-    });
+  const K = 0.07;
+  const c1 = [root[0] + out[0] * K, root[1] + out[1] * K];
+  const c2 = [armpit[0] - down[0] * K, armpit[1] - down[1] * K];
+
+  // A dense polyline: a cubic curve over the shoulder, then the hanging part.
+  const line = [];
+  const STEPS = 60;
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS;
+    const u = 1 - t;
+    line.push(
+      [0, 1].map(
+        k =>
+          u * u * u * root[k] +
+          3 * u * u * t * c1[k] +
+          3 * u * t * t * c2[k] +
+          t * t * t * armpit[k],
+      ),
+    );
   }
-  return rows;
+  for (let i = 1; i <= STEPS; i++) {
+    const s = (hang * i) / STEPS;
+    line.push([armpit[0] + down[0] * s, armpit[1] + down[1] * s]);
+  }
+
+  // Resample by arc length.
+  const along = [0];
+  for (let i = 1; i < line.length; i++) {
+    along.push(
+      along[i - 1] +
+        Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]),
+    );
+  }
+  const total = along[along.length - 1];
+  const at = d => {
+    let i = 1;
+    while (i < line.length - 1 && along[i] < d) {
+      i++;
+    }
+    const k = (d - along[i - 1]) / (along[i] - along[i - 1] || 1);
+    return [0, 1].map(j => line[i - 1][j] + (line[i][j] - line[i - 1][j]) * k);
+  };
+  const result = [];
+  for (let r = 0; r < count; r++) {
+    const d = (r / (count - 1)) * total;
+    const a = at(Math.max(0, d - 0.005));
+    const b = at(Math.min(total, d + 0.005));
+    const dir = normalize([b[0] - a[0], b[1] - a[1], 0]);
+    result.push({centre: at(d), dir: [dir[0], dir[1]]});
+  }
+  return result;
 }
 
 /** Short-sleeve tee, or a long-sleeve shirt with sleeves angled down to the cuff. */
@@ -241,23 +272,11 @@ function buildShirt({long = false} = {}) {
     [0.71, 0.098, 0.063],
     [TOP, 0.09, 0.06],
   ];
-  // At rest the shoulder slopes from the collar out onto the rounded top of
-  // the sleeve, so the two read as one line.
-  const restTorso = [
-    [0.0, 0.214, 0.099],
-    [0.06, 0.212, 0.097],
-    [0.3, 0.2, 0.092],
-    [0.48, 0.223, 0.104],
-    [0.6, 0.235, 0.1],
-    [0.645, 0.248, 0.09],
-    [0.672, 0.225, 0.078],
-    [0.692, 0.16, 0.068],
-    [0.712, 0.102, 0.063],
-    [TOP, 0.09, 0.06],
-  ];
 
-  const torsoRing = (table, y) => {
-    const [w, d] = profile(table, y);
+  const torsoRows = [];
+  for (let r = 0; r < ROWS; r++) {
+    const y = (r / (ROWS - 1)) * TOP;
+    const [w, d] = profile(torso, y);
     const neckBlend = smoothstep((y - 0.6) / (TOP - 0.6));
     const ring = [];
     for (let i = 0; i < RING; i++) {
@@ -276,17 +295,10 @@ function buildShirt({long = false} = {}) {
         (0.05 * Math.max(0, s) ** 2 + 0.01 * Math.max(0, -s)) * neckBlend;
       ring.push([x, y - dip, z]);
     }
-    return ring;
-  };
-  const torsoRows = [];
-  const restTorsoRows = [];
-  for (let r = 0; r < ROWS; r++) {
-    const y = (r / (ROWS - 1)) * TOP;
-    torsoRows.push(torsoRing(torso, y));
-    restTorsoRows.push(torsoRing(restTorso, y));
+    torsoRows.push(ring);
   }
   mesh.addLoft(torsoRows);
-  rest.addLoft(restTorsoRows);
+  rest.addLoft(torsoRows);
 
   // Ribbed collar following the neck opening.
   const neck = torsoRows[ROWS - 1];
@@ -299,13 +311,8 @@ function buildShirt({long = false} = {}) {
   const up = [Math.sin(tilt), Math.cos(tilt), 0];
   const SLEEVE_ROWS = long ? 30 : 16;
   const SLEEVE_RING = 40;
-  // At rest a long sleeve reaches down to the hem; a short one to mid upper
-  // arm. The rounded cap is as deep as the sleeve is wide.
-  const resting = restingSleeve(
-    SLEEVE_ROWS,
-    long ? 0.615 : 0.255,
-    0.088 * REST_SLIM,
-  );
+  // At rest a long sleeve reaches down to the hem; a short one above the elbow.
+  const resting = restingSleeve(SLEEVE_ROWS, long ? 0.48 : 0.13);
   [1, -1].forEach(side => {
     const root = [side * 0.16, 0.588, 0];
     const length = long ? 0.6 : 0.27;
@@ -321,15 +328,8 @@ function buildShirt({long = false} = {}) {
         root[1] + dir[1] * length * t,
         0,
       ];
-      // At rest: slimmer, closed into a rounded cap at the shoulder, tapering
-      // the same way down the arm.
-      const {centre, dir: hang, open, t: rt} = resting[r];
+      const {centre, dir: hang} = resting[r];
       const restUp = [-hang[1], hang[0]];
-      const restScale = REST_SLIM * open;
-      const restU =
-        (0.088 - (long ? 0.04 : 0.02) * smoothstep(rt)) * restScale;
-      const restZ =
-        (0.086 - (long ? 0.038 : 0.02) * smoothstep(rt)) * restScale;
       const ring = [];
       const restRing = [];
       for (let i = 0; i < SLEEVE_RING; i++) {
@@ -341,12 +341,10 @@ function buildShirt({long = false} = {}) {
           c[1] + up[1] * (a + fold),
           b + fold,
         ]);
-        const [ra, rb] = superEllipse(theta, restU, restZ, 2.2);
-        const restFold = fold * restScale;
         restRing.push([
-          side * (centre[0] + restUp[0] * (ra + restFold)),
-          centre[1] + restUp[1] * (ra + restFold),
-          rb + restFold,
+          side * (centre[0] + restUp[0] * (a + fold)),
+          centre[1] + restUp[1] * (a + fold),
+          b + fold,
         ]);
       }
       rows.push(ring);
