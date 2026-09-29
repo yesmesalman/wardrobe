@@ -161,6 +161,7 @@ export function OutfitSwipeZone({
 
   return (
     <View style={[styles.zone, style]} {...panResponder.panHandlers}>
+      {/* The nearest previews are drawn last, over the ones beyond them. */}
       {previous?.map((g, i) => (
         <NeighbourPeek
           key={g.id}
@@ -170,7 +171,7 @@ export function OutfitSwipeZone({
           centre={centre}
           onPress={() => onIndexChange(index - (i + 1))}
         />
-      ))}
+      )).reverse()}
       {next?.map((g, i) => (
         <NeighbourPeek
           key={g.id}
@@ -180,7 +181,7 @@ export function OutfitSwipeZone({
           centre={centre}
           onPress={() => onIndexChange(index + (i + 1))}
         />
-      ))}
+      )).reverse()}
     </View>
   );
 }

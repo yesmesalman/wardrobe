@@ -4,8 +4,9 @@ import {VARIANT_LABELS} from '../constants';
 import {fileUri} from '../storage/wardrobeStorage';
 import type {Garment} from '../types';
 
-const WIDTH = 52;
-const HEIGHT = 64;
+// Small enough to sit beside the figure's sleeves at the screen edge.
+const WIDTH = 40;
+const HEIGHT = 50;
 const EDGE = 4;
 
 interface Props {
@@ -47,9 +48,10 @@ export function NeighbourPeek({garment, side, distance, centre, onPress}: Props)
   const scale = depth.interpolate({inputRange: range, outputRange: [1, 0.7]});
   const shift = depth.interpolate({
     inputRange: range,
-    outputRange: [sign * (WIDTH - 8), sign * -EDGE],
+    // The nearest overlaps the one beyond it, like a fanned deck.
+    outputRange: [sign * WIDTH * 0.55, sign * -EDGE],
   });
-  const drop = depth.interpolate({inputRange: range, outputRange: [0, 16]});
+  const drop = depth.interpolate({inputRange: range, outputRange: [0, 12]});
   const tilt = depth.interpolate({
     inputRange: range,
     outputRange: ['0deg', `${-sign * 9}deg`],

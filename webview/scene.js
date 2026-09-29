@@ -143,16 +143,15 @@ const OUTFIT = {
   pantsHeight: 1.14,
   // Framing: the figure fills the height (with this much air) unless a wide
   // long-sleeve shirt needs the width; the camera glides when that changes.
-  // The figure takes about half the screen width; the app shows two small
-  // previews of neighbouring garments on each side.
+  // The figure may take about 70% of the screen width; the app tucks two
+  // small previews of neighbouring garments into each side.
   heightMargin: 1.12,
-  widthMargin: 2.0,
+  widthMargin: 1.45,
   defaultWidth: 0.9,
   // The pants are a little deeper than the shirt's hem; flatten them slightly
   // so the waistband stays tucked under the shirt.
   pantsDepth: 0.72,
-  // Garments slide this far sideways, in this many ms, when swapped.
-  slideDistance: 1.4,
+  // Garments slide a screen's width sideways, in this many ms, when swapped.
   slideMs: 300,
   // A dragged garment that is let go without changing springs back this fast.
   returnMs: 220,
@@ -497,15 +496,15 @@ async function setOutfit(specs) {
         // the new one follows a slide's width behind it, and the rest of the
         // way takes a matching share of the time.
         const from = old.group.position.x;
-        const left = Math.abs(from + dir * OUTFIT.slideDistance);
-        const duration =
-          OUTFIT.slideMs * Math.max(0.4, left / OUTFIT.slideDistance);
-        slide(old, from, -dir * OUTFIT.slideDistance, {
+        const span = outfitSpan();
+        const left = Math.abs(from + dir * span);
+        const duration = OUTFIT.slideMs * Math.max(0.4, left / span);
+        slide(old, from, -dir * span, {
           part,
           duration,
           done: () => disposeOf(old),
         });
-        slide(g, from + dir * OUTFIT.slideDistance, 0, {part, duration});
+        slide(g, from + dir * span, 0, {part, duration});
       } else if (old) {
         disposeOf(old);
       }
@@ -517,11 +516,13 @@ async function setOutfit(specs) {
   }
 }
 
-/** World units per screen pixel at the outfit's depth. */
-function outfitPixel() {
+/**
+ * How wide the screen is, in world units, at the outfit's depth once the
+ * camera has settled: a garment moved this far is fully off screen.
+ */
+function outfitSpan() {
   const half = Math.tan((FOV * Math.PI) / 360);
-  const visible = 2 * half * outfitCam.distance * camera.aspect;
-  return visible / (window.innerWidth || 1);
+  return 2 * half * outfitCam.tDistance * camera.aspect;
 }
 
 /**
@@ -535,11 +536,9 @@ function dragOutfit(part, px) {
     return;
   }
   finishTransitions(part);
-  const x = px * outfitPixel();
-  g.group.position.x = Math.max(
-    -OUTFIT.slideDistance,
-    Math.min(OUTFIT.slideDistance, x),
-  );
+  const span = outfitSpan();
+  const x = (px * span) / (window.innerWidth || 1);
+  g.group.position.x = Math.max(-span, Math.min(span, x));
 }
 
 /** Lets a dragged garment that did not change spring back into place. */
