@@ -12,7 +12,7 @@
  * ("Fabric") and a `decal` entry in the node extras that tells the app where
  * a user's photo is projected onto the garment.
  */
-const {Buffer} = require('buffer');
+const { Buffer } = require('buffer');
 const fs = require('fs');
 const path = require('path');
 
@@ -82,7 +82,7 @@ class Mesh {
    * points, all rows with the same point count). Normals are smoothed and
    * oriented away from the loft's centre line.
    */
-  addLoft(rows, {closedRows = false} = {}) {
+  addLoft(rows, { closedRows = false } = {}) {
     const base = this.positions.length;
     const rowCount = rows.length;
     const ringSize = rows[0].length;
@@ -181,7 +181,7 @@ function ringTube(points, radius, segments = 8) {
 // ---------------------------------------------------------------------------
 
 /** Short-sleeve tee, or a long-sleeve shirt with sleeves angled down to the cuff. */
-function buildShirt({long = false} = {}) {
+function buildShirt({ long = false } = {}) {
   const mesh = new Mesh();
   const RING = 72;
   const ROWS = 48;
@@ -192,8 +192,8 @@ function buildShirt({long = false} = {}) {
   const torso = [
     [0.0, 0.2, 0.096],
     [0.42, 0.2, 0.098],
-    [0.6, 0.226, 0.1],
-    [0.645, 0.232, 0.092],
+    [0.64, 0.205, 0.098],
+    [0.667, 0.2, 0.092],
     [0.685, 0.16, 0.078],
     [0.712, 0.106, 0.064],
     [TOP, 0.09, 0.06],
@@ -211,7 +211,8 @@ function buildShirt({long = false} = {}) {
       // Soft fabric folds, strongest near the hem.
       const fold =
         0.006 *
-        (Math.sin(11 * theta + 6 * y) + 0.6 * Math.sin(17 * theta - 9 * y + 1.3)) *
+        (Math.sin(11 * theta + 6 * y) +
+          0.6 * Math.sin(17 * theta - 9 * y + 1.3)) *
         (0.35 + 0.65 * (1 - y / TOP));
       x *= 1 + fold / w;
       z *= 1 + fold / d;
@@ -227,7 +228,7 @@ function buildShirt({long = false} = {}) {
 
   // Ribbed collar following the neck opening.
   const neck = torsoRows[ROWS - 1];
-  mesh.addLoft(ringTube(neck, 0.009), {closedRows: true});
+  mesh.addLoft(ringTube(neck, 0.009), { closedRows: true });
 
   // Sleeves hang from the shoulder point, angled out and down. Short ones
   // are a wide, flat tube whose hem ends level with the armpit.
@@ -235,11 +236,15 @@ function buildShirt({long = false} = {}) {
   const dir = [Math.cos(tilt), -Math.sin(tilt), 0];
   const up = [Math.sin(tilt), Math.cos(tilt), 0];
   const shoulder = [0.236, 0.649];
-  const SLEEVE_ROWS = long ? 30 : 16;
+  // The shoulder seam, sloping from the collar down to the shoulder point.
+  const seamY = x => shoulder[1] + (shoulder[0] - x) * 0.49;
+  // The sleeve starts a little inside the body, so it joins it seamlessly.
+  const INSET = 0.03;
+  const SLEEVE_ROWS = long ? 30 : 18;
   const SLEEVE_RING = 40;
   [1, -1].forEach(side => {
     const r0 = 0.086;
-    // The sleeve's top edge starts at the shoulder point.
+    // The sleeve's top edge passes through the shoulder point.
     const root = [
       side * (shoulder[0] - up[0] * r0),
       shoulder[1] - up[1] * r0,
@@ -248,25 +253,29 @@ function buildShirt({long = false} = {}) {
     const length = long ? 0.6 : 0.2;
     const rows = [];
     for (let r = 0; r < SLEEVE_ROWS; r++) {
-      const t = r / (SLEEVE_ROWS - 1);
-      // Long sleeves taper to a snug cuff; short ones flare slightly.
+      const s = -INSET + (r / (SLEEVE_ROWS - 1)) * (length + INSET);
+      const t = Math.max(0, s / length);
+      // Long sleeves taper to a snug cuff; short ones flare slightly. Both
+      // are thinner than the body, so their root stays hidden inside it.
       const ru = r0 - (long ? 0.038 : -0.004) * smoothstep(t);
-      const rz = (long ? 0.086 : 0.066) - (long ? 0.038 : 0.008) * smoothstep(t);
-      const c = [
-        root[0] + side * dir[0] * length * t,
-        root[1] + dir[1] * length * t,
-        0,
-      ];
+      const rz = 0.062 - (long ? 0.02 : 0.004) * smoothstep(t);
+      const c = [root[0] + side * dir[0] * s, root[1] + dir[1] * s, 0];
       const ring = [];
       for (let i = 0; i < SLEEVE_RING; i++) {
         const theta = (i / SLEEVE_RING) * TAU;
         const [a, b] = superEllipse(theta, ru, rz, 2.2);
         const fold = 0.003 * Math.sin(9 * theta + 8 * t);
-        ring.push([
-          c[0] + side * up[0] * (a + fold),
+        const x = c[0] + side * up[0] * (a + fold);
+        // Keep the sleeve under the shoulder line, which carries on past the
+        // shoulder point, so the shoulder rounds smoothly into the sleeve. The
+        // line dips towards the front and back, so the sleeve thins to a seam
+        // along the top and never peeks over the shoulder from below.
+        const z = b + fold;
+        const y = Math.min(
           c[1] + up[1] * (a + fold),
-          b + fold,
-        ]);
+          seamY(Math.abs(x)) - 0.004 - 0.3 * Math.abs(z),
+        );
+        ring.push([x, y, z]);
       }
       rows.push(ring);
     }
@@ -300,7 +309,7 @@ function buildShirt({long = false} = {}) {
  * to a slim hem. Long pants hang to y = -0.14, so the inseam (FORK to hem,
  * 0.8) is about 70% of the whole length, as on real jeans.
  */
-function buildPants({shorts = false} = {}) {
+function buildPants({ shorts = false } = {}) {
   const mesh = new Mesh();
   const RING = 64;
   const TOP = 1.0;
@@ -403,7 +412,7 @@ function buildPants({shorts = false} = {}) {
 // GLB writer
 // ---------------------------------------------------------------------------
 
-function toGLB({mesh, name, decal}) {
+function toGLB({ mesh, name, decal }) {
   const positions = new Float32Array(mesh.positions.flat());
   const normals = new Float32Array(mesh.normals.flat());
   const indices = new Uint32Array(mesh.indices);
@@ -423,15 +432,15 @@ function toGLB({mesh, name, decal}) {
   const bin = Buffer.concat([posBytes, nrmBytes, idxBytes]);
 
   const gltf = {
-    asset: {version: '2.0', generator: 'wardrobe/scripts/generate-models.js'},
+    asset: { version: '2.0', generator: 'wardrobe/scripts/generate-models.js' },
     scene: 0,
-    scenes: [{nodes: [0]}],
-    nodes: [{name, mesh: 0, extras: {decal}}],
+    scenes: [{ nodes: [0] }],
+    nodes: [{ name, mesh: 0, extras: { decal } }],
     meshes: [
       {
         name,
         primitives: [
-          {attributes: {POSITION: 0, NORMAL: 1}, indices: 2, material: 0},
+          { attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 },
         ],
       },
     ],
@@ -461,10 +470,15 @@ function toGLB({mesh, name, decal}) {
         count: mesh.normals.length,
         type: 'VEC3',
       },
-      {bufferView: 2, componentType: 5125, count: indices.length, type: 'SCALAR'},
+      {
+        bufferView: 2,
+        componentType: 5125,
+        count: indices.length,
+        type: 'SCALAR',
+      },
     ],
     bufferViews: [
-      {buffer: 0, byteOffset: 0, byteLength: posBytes.length, target: 34962},
+      { buffer: 0, byteOffset: 0, byteLength: posBytes.length, target: 34962 },
       {
         buffer: 0,
         byteOffset: posBytes.length,
@@ -478,7 +492,7 @@ function toGLB({mesh, name, decal}) {
         target: 34963,
       },
     ],
-    buffers: [{byteLength: bin.length}],
+    buffers: [{ byteLength: bin.length }],
   };
 
   const pad = (buf, byte) => {
@@ -508,16 +522,18 @@ function toGLB({mesh, name, decal}) {
   ]);
 }
 
-fs.mkdirSync(OUT_DIR, {recursive: true});
+fs.mkdirSync(OUT_DIR, { recursive: true });
 [
   ['blank_shirt.glb', buildShirt()],
-  ['blank_shirt_long.glb', buildShirt({long: true})],
+  ['blank_shirt_long.glb', buildShirt({ long: true })],
   ['blank_pants.glb', buildPants()],
-  ['blank_shorts.glb', buildPants({shorts: true})],
+  ['blank_shorts.glb', buildPants({ shorts: true })],
 ].forEach(([file, model]) => {
   const glb = toGLB(model);
   fs.writeFileSync(path.join(OUT_DIR, file), glb);
   console.log(
-    `${file}: ${model.mesh.positions.length} vertices, ${(glb.length / 1024).toFixed(0)} KB`,
+    `${file}: ${model.mesh.positions.length} vertices, ${(
+      glb.length / 1024
+    ).toFixed(0)} KB`,
   );
 });
