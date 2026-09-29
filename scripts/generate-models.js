@@ -12,7 +12,7 @@
  * ("Fabric") and a `decal` entry in the node extras that tells the app where
  * a user's photo is projected onto the garment.
  */
-const { Buffer } = require('buffer');
+const {Buffer} = require('buffer');
 const fs = require('fs');
 const path = require('path');
 
@@ -82,7 +82,7 @@ class Mesh {
    * points, all rows with the same point count). Normals are smoothed and
    * oriented away from the loft's centre line.
    */
-  addLoft(rows, { closedRows = false } = {}) {
+  addLoft(rows, {closedRows = false} = {}) {
     const base = this.positions.length;
     const rowCount = rows.length;
     const ringSize = rows[0].length;
@@ -181,28 +181,36 @@ function ringTube(points, radius, segments = 8) {
 // ---------------------------------------------------------------------------
 
 /** Short-sleeve tee, or a long-sleeve shirt with sleeves angled down to the cuff. */
-function buildShirt({ long = false } = {}) {
+function buildShirt({long = false} = {}) {
   const mesh = new Mesh();
   const RING = 72;
-  const ROWS = 48;
+  const ROWS = 80;
   const TOP = 0.725;
 
+  // The shoulder line slopes about 26 degrees from the collar down to the
+  // shoulder point, where the sleeve takes over.
+  const shoulder = [0.236, 0.649];
+  const SLOPE = 0.49;
+  const seamY = x => shoulder[1] + (shoulder[0] - x) * SLOPE;
+  const seamX = y => shoulder[0] - (y - shoulder[1]) / SLOPE;
+
   // [y, half width, half depth]. A boxy tee: straight sides from the hem up
-  // to the armpit, then shoulders sloping about 30 degrees up to the collar.
+  // to the armpit; above that the width follows the shoulder line.
   const torso = [
     [0.0, 0.2, 0.096],
     [0.42, 0.2, 0.098],
     [0.64, 0.205, 0.098],
-    [0.667, 0.2, 0.092],
-    [0.685, 0.16, 0.078],
-    [0.712, 0.106, 0.064],
+    [0.667, 0.205, 0.092],
+    [0.685, 0.205, 0.078],
+    [0.712, 0.205, 0.064],
     [TOP, 0.09, 0.06],
   ];
 
   const torsoRows = [];
   for (let r = 0; r < ROWS; r++) {
     const y = (r / (ROWS - 1)) * TOP;
-    const [w, d] = profile(torso, y);
+    const [pw, d] = profile(torso, y);
+    const w = Math.min(pw, Math.max(0.09, seamX(y)));
     const neckBlend = smoothstep((y - 0.6) / (TOP - 0.6));
     const ring = [];
     for (let i = 0; i < RING; i++) {
@@ -228,16 +236,14 @@ function buildShirt({ long = false } = {}) {
 
   // Ribbed collar following the neck opening.
   const neck = torsoRows[ROWS - 1];
-  mesh.addLoft(ringTube(neck, 0.009), { closedRows: true });
+  mesh.addLoft(ringTube(neck, 0.009), {closedRows: true});
 
-  // Sleeves hang from the shoulder point, angled out and down. Short ones
-  // are a wide, flat tube whose hem ends level with the armpit.
-  const tilt = ((long ? 46 : 55) * Math.PI) / 180;
+  // Sleeves hang from the shoulder point, angled about 46 degrees below
+  // horizontal, leaving a natural gap under the arm. Short ones are the
+  // first stretch of a long sleeve.
+  const tilt = (46 * Math.PI) / 180;
   const dir = [Math.cos(tilt), -Math.sin(tilt), 0];
   const up = [Math.sin(tilt), Math.cos(tilt), 0];
-  const shoulder = [0.236, 0.649];
-  // The shoulder seam, sloping from the collar down to the shoulder point.
-  const seamY = x => shoulder[1] + (shoulder[0] - x) * 0.49;
   // The sleeve starts a little inside the body, so it joins it seamlessly.
   const INSET = 0.03;
   const SLEEVE_ROWS = long ? 30 : 18;
@@ -250,7 +256,7 @@ function buildShirt({ long = false } = {}) {
       shoulder[1] - up[1] * r0,
       0,
     ];
-    const length = long ? 0.6 : 0.2;
+    const length = long ? 0.6 : 0.19;
     const rows = [];
     for (let r = 0; r < SLEEVE_ROWS; r++) {
       const s = -INSET + (r / (SLEEVE_ROWS - 1)) * (length + INSET);
@@ -309,7 +315,7 @@ function buildShirt({ long = false } = {}) {
  * to a slim hem. Long pants hang to y = -0.14, so the inseam (FORK to hem,
  * 0.8) is about 70% of the whole length, as on real jeans.
  */
-function buildPants({ shorts = false } = {}) {
+function buildPants({shorts = false} = {}) {
   const mesh = new Mesh();
   const RING = 64;
   const TOP = 1.0;
@@ -412,7 +418,7 @@ function buildPants({ shorts = false } = {}) {
 // GLB writer
 // ---------------------------------------------------------------------------
 
-function toGLB({ mesh, name, decal }) {
+function toGLB({mesh, name, decal}) {
   const positions = new Float32Array(mesh.positions.flat());
   const normals = new Float32Array(mesh.normals.flat());
   const indices = new Uint32Array(mesh.indices);
@@ -432,15 +438,15 @@ function toGLB({ mesh, name, decal }) {
   const bin = Buffer.concat([posBytes, nrmBytes, idxBytes]);
 
   const gltf = {
-    asset: { version: '2.0', generator: 'wardrobe/scripts/generate-models.js' },
+    asset: {version: '2.0', generator: 'wardrobe/scripts/generate-models.js'},
     scene: 0,
-    scenes: [{ nodes: [0] }],
-    nodes: [{ name, mesh: 0, extras: { decal } }],
+    scenes: [{nodes: [0]}],
+    nodes: [{name, mesh: 0, extras: {decal}}],
     meshes: [
       {
         name,
         primitives: [
-          { attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 },
+          {attributes: {POSITION: 0, NORMAL: 1}, indices: 2, material: 0},
         ],
       },
     ],
@@ -478,7 +484,7 @@ function toGLB({ mesh, name, decal }) {
       },
     ],
     bufferViews: [
-      { buffer: 0, byteOffset: 0, byteLength: posBytes.length, target: 34962 },
+      {buffer: 0, byteOffset: 0, byteLength: posBytes.length, target: 34962},
       {
         buffer: 0,
         byteOffset: posBytes.length,
@@ -492,7 +498,7 @@ function toGLB({ mesh, name, decal }) {
         target: 34963,
       },
     ],
-    buffers: [{ byteLength: bin.length }],
+    buffers: [{byteLength: bin.length}],
   };
 
   const pad = (buf, byte) => {
@@ -522,12 +528,12 @@ function toGLB({ mesh, name, decal }) {
   ]);
 }
 
-fs.mkdirSync(OUT_DIR, { recursive: true });
+fs.mkdirSync(OUT_DIR, {recursive: true});
 [
   ['blank_shirt.glb', buildShirt()],
-  ['blank_shirt_long.glb', buildShirt({ long: true })],
+  ['blank_shirt_long.glb', buildShirt({long: true})],
   ['blank_pants.glb', buildPants()],
-  ['blank_shorts.glb', buildPants({ shorts: true })],
+  ['blank_shorts.glb', buildPants({shorts: true})],
 ].forEach(([file, model]) => {
   const glb = toGLB(model);
   fs.writeFileSync(path.join(OUT_DIR, file), glb);
