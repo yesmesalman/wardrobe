@@ -185,8 +185,8 @@ function ringTube(points, radius, segments = 8) {
 // Shirt
 // ---------------------------------------------------------------------------
 
-/** Resting arms hang this far out from vertical. */
-const REST_ANGLE = (15 * Math.PI) / 180;
+/** Resting arms hang this far out from vertical: almost straight, close to the body. */
+const REST_ANGLE = (3 * Math.PI) / 180;
 
 /**
  * Centre line of a right sleeve (x > 0) hanging at rest: it leaves the
@@ -197,7 +197,7 @@ const REST_ANGLE = (15 * Math.PI) / 180;
 function restingSleeve(count, hang) {
   const root = [0.16, 0.588];
   const out = [Math.cos(0.35), -Math.sin(0.35)]; // about 20° below level
-  const armpit = [0.3, 0.5];
+  const armpit = [0.29, 0.5];
   const down = [Math.sin(REST_ANGLE), -Math.cos(REST_ANGLE)];
   const K = 0.07;
   const c1 = [root[0] + out[0] * K, root[1] + out[1] * K];
