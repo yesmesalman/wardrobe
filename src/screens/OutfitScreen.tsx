@@ -1,14 +1,24 @@
 import React, {useMemo, useState} from 'react';
 import {StyleSheet, View} from 'react-native';
+import {trigger} from 'react-native-haptic-feedback';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {OutfitScene} from '../components/OutfitScene';
+import {OutfitScene, type OutfitLayout} from '../components/OutfitScene';
 import {OutfitSwipeZone} from '../components/OutfitSwipeZone';
 import {ScreenHeader} from '../components/ScreenHeader';
 import {theme} from '../constants';
 import {useWardrobeContext} from '../state/WardrobeContext';
+import type {Garment} from '../types';
 
 /** Until the scene reports where the waist falls, assume roughly here. */
-const DEFAULT_SPLIT = 0.5;
+const DEFAULT_LAYOUT: OutfitLayout = {
+  split: 0.5,
+  shirtCentre: 0.28,
+  pantsCentre: 0.75,
+};
+
+/** Up to two items on one side of `at`, nearest first. */
+const neighbours = (list: Garment[], at: number, dir: 1 | -1) =>
+  [list[at + dir], list[at + 2 * dir]].filter(Boolean);
 
 /**
  * The outfit, as if someone were wearing it: the shirt from the Library over
@@ -27,7 +37,8 @@ export function OutfitScreen() {
   // slides in from that side.
   const [shirtSlide, setShirtSlide] = useState(0);
   const [pantsSlide, setPantsSlide] = useState(0);
-  const [split, setSplit] = useState(DEFAULT_SPLIT);
+  const [layout, setLayout] = useState(DEFAULT_LAYOUT);
+  const {split} = layout;
 
   const shirts = useMemo(
     () => garments.filter(g => g.kind === 'shirt'),
@@ -45,10 +56,16 @@ export function OutfitScreen() {
   const trousers = pants[pantsAt] ?? null;
 
   const changeShirt = (next: number) => {
+    if (next !== shirtAt) {
+      trigger('impactLight');
+    }
     setShirtSlide(Math.sign(next - shirtAt));
     setShirtIndex(next);
   };
   const changePants = (next: number) => {
+    if (next !== pantsAt) {
+      trigger('impactLight');
+    }
     setPantsSlide(Math.sign(next - pantsAt));
     setPantsIndex(next);
   };
@@ -64,7 +81,7 @@ export function OutfitScreen() {
           pants={trousers}
           shirtSlide={shirtSlide}
           pantsSlide={pantsSlide}
-          onSplitChange={setSplit}
+          onSplitChange={setLayout}
           style={StyleSheet.absoluteFill}
         />
         <OutfitSwipeZone
@@ -73,6 +90,9 @@ export function OutfitScreen() {
           count={shirts.length}
           index={shirtAt}
           onIndexChange={changeShirt}
+          previous={neighbours(shirts, shirtAt, -1)}
+          next={neighbours(shirts, shirtAt, 1)}
+          centre={layout.shirtCentre / split}
           onAdd={() => startAdd('shirt')}
           style={[styles.top, {height: percent(split)}]}
         />
@@ -82,6 +102,9 @@ export function OutfitScreen() {
           count={pants.length}
           index={pantsAt}
           onIndexChange={changePants}
+          previous={neighbours(pants, pantsAt, -1)}
+          next={neighbours(pants, pantsAt, 1)}
+          centre={(layout.pantsCentre - split) / (1 - split)}
           onAdd={() => startAdd('pants')}
           style={[styles.bottom, {top: percent(split)}]}
         />

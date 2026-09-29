@@ -43,20 +43,7 @@ const render = async (element: React.ReactElement) => {
 };
 
 describe('OutfitSwipeZone', () => {
-  test('shows which item is on screen when there are several', async () => {
-    const renderer = await render(
-      <OutfitSwipeZone
-        kind="shirt"
-        count={6}
-        index={1}
-        onIndexChange={jest.fn()}
-        onAdd={jest.fn()}
-      />,
-    );
-    expect(text(renderer)).toContain('2 / 6');
-  });
-
-  test('has no badge when there is only one item', async () => {
+  test('shows no text or count when there is only one item', async () => {
     const renderer = await render(
       <OutfitSwipeZone
         kind="pants"

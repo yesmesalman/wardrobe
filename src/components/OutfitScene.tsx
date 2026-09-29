@@ -6,6 +6,13 @@ import {readFileBase64} from '../storage/wardrobeStorage';
 import type {Garment} from '../types';
 import {SCENE_HTML} from '../webview/sceneHtml';
 
+/** Where the waist and the middle of each garment fall, as fractions of the view's height. */
+export interface OutfitLayout {
+  split: number;
+  shirtCentre: number;
+  pantsCentre: number;
+}
+
 interface Props {
   shirt: Garment | null;
   pants: Garment | null;
@@ -17,7 +24,7 @@ interface Props {
   pantsSlide?: number;
   style?: ViewStyle;
   /** Fraction of the height, from the top, where the shirt meets the pants. */
-  onSplitChange?: (split: number) => void;
+  onSplitChange?: (layout: OutfitLayout) => void;
 }
 
 interface Loaded {
@@ -129,7 +136,7 @@ export function OutfitScene({
       } else if (message.type === 'loaded') {
         setShown(true);
       } else if (message.type === 'outfitLayout') {
-        onSplitChange?.(message.split);
+        onSplitChange?.(message);
       } else if (message.type === 'error') {
         console.warn('3D scene error:', message.message);
       }

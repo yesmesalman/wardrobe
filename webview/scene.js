@@ -141,8 +141,10 @@ const OUTFIT = {
   pantsHeight: 1.14,
   // Framing: the figure fills the height (with this much air) unless a wide
   // long-sleeve shirt needs the width; the camera glides when that changes.
+  // The figure takes about half the screen width; the app shows two small
+  // previews of neighbouring garments on each side.
   heightMargin: 1.12,
-  widthMargin: 1.06,
+  widthMargin: 2.0,
   defaultWidth: 0.9,
   // The pants are a little deeper than the shirt's hem; flatten them slightly
   // so the waistband stays tucked under the shirt.
@@ -592,8 +594,21 @@ function fitCamera() {
     placeOutfitCamera();
     // Where the waist (y = 0) falls on screen once the camera has settled, so
     // the app can split its touch zones there.
-    const ndc = -outfitCam.tCentre / (outfitCam.tDistance * half);
-    post({type: 'outfitLayout', split: (1 - ndc) / 2});
+    const screenY = y =>
+      (1 - (y - outfitCam.tCentre) / (outfitCam.tDistance * half)) / 2;
+    const shirtHeight = outfit.shirt
+      ? outfit.shirt.model.size.height
+      : OUTFIT.shirtHeight;
+    const pantsHeight = outfit.pants
+      ? outfit.pants.model.size.height
+      : OUTFIT.pantsHeight;
+    post({
+      type: 'outfitLayout',
+      split: screenY(0),
+      // Where each garment's middle falls, as a fraction of the view's height.
+      shirtCentre: screenY(-OUTFIT.overlap + shirtHeight / 2),
+      pantsCentre: screenY(-pantsHeight / 2),
+    });
     return;
   }
   const distance = Math.max(

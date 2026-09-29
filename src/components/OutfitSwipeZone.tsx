@@ -9,8 +9,9 @@ import {
   ViewStyle,
 } from 'react-native';
 import {theme} from '../constants';
-import type {GarmentKind} from '../types';
+import type {Garment, GarmentKind} from '../types';
 import {PantsIcon, ShirtIcon} from './icons';
+import {NeighbourPeek} from './NeighbourPeek';
 
 interface Props {
   kind: GarmentKind;
@@ -19,6 +20,11 @@ interface Props {
   count: number;
   index: number;
   onIndexChange: (index: number) => void;
+  /** Up to two items before and after the current one, nearest first. */
+  previous?: Garment[];
+  next?: Garment[];
+  /** Where the garment's middle falls in this zone (0 = top, 1 = bottom). */
+  centre?: number;
   /** Tapped on the placeholder shown when there is nothing to pick from. */
   onAdd: () => void;
   style?: StyleProp<ViewStyle>;
@@ -48,8 +54,8 @@ const EMPTY_TITLE: Record<GarmentKind, string> = {
 
 /**
  * An invisible touch area over one garment of the outfit: swipe sideways to
- * pick another from the Library. It draws only a small
- * position badge, or a dashed placeholder when there is nothing to show.
+ * pick another from the Library. It draws only small previews of the
+ * neighbouring items, or a dashed placeholder when there is nothing to show.
  */
 export function OutfitSwipeZone({
   kind,
@@ -57,6 +63,9 @@ export function OutfitSwipeZone({
   count,
   index,
   onIndexChange,
+  previous,
+  next,
+  centre = 0.5,
   onAdd,
   style,
 }: Props) {
@@ -96,31 +105,32 @@ export function OutfitSwipeZone({
 
   return (
     <View style={[styles.zone, style]} {...panResponder.panHandlers}>
-      {count > 1 ? (
-        <View style={styles.badge} pointerEvents="none">
-          <Text style={styles.badgeText}>
-            {index > 0 ? '‹ ' : '  '}
-            {index + 1} / {count}
-            {index < count - 1 ? ' ›' : '  '}
-          </Text>
-        </View>
-      ) : null}
+      {previous?.map((g, i) => (
+        <NeighbourPeek
+          key={g.id}
+          garment={g}
+          side="left"
+          distance={(i + 1) as 1 | 2}
+          centre={centre}
+          onPress={() => onIndexChange(index - (i + 1))}
+        />
+      ))}
+      {next?.map((g, i) => (
+        <NeighbourPeek
+          key={g.id}
+          garment={g}
+          side="right"
+          distance={(i + 1) as 1 | 2}
+          centre={centre}
+          onPress={() => onIndexChange(index + (i + 1))}
+        />
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   zone: {position: 'absolute', left: 0, right: 0},
-  badge: {
-    position: 'absolute',
-    top: 10,
-    right: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: 'rgba(28,27,26,0.55)',
-  },
-  badgeText: {color: '#fff', fontSize: 12, fontWeight: '700'},
   empty: {
     alignSelf: 'center',
     marginTop: 24,
