@@ -84,7 +84,7 @@ test('has Library, Outfit, Trending and Settings tabs, with a centre Add item bu
 
   await openTab(renderer, 'Outfit');
   text = screenText(renderer);
-  expect(text).toContain('Swipe to mix and match');
+  expect(text).toContain('Mix and match your wardrobe');
   // Nothing in the Library yet, so both rows are placeholders.
   expect(text).toContain('Add a shirt');
   expect(text).toContain('Add pants');
