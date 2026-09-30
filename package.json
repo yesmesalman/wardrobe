@@ -8,7 +8,6 @@
     "lint": "eslint .",
     "start": "react-native start",
     "generate:models": "node scripts/generate-models.js",
-    "generate:splash": "react-native-bootsplash generate src/assets/hanger.png --platforms=android,ios --background=FFFFFF --logo-width=112 --assets-output=src/assets/bootsplash",
     "build:webview": "node scripts/build-webview.js",
     "test": "jest"
   },
