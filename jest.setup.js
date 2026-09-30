@@ -21,3 +21,17 @@ jest.mock('react-native-svg', () => {
 
 // Ships untranspiled TypeScript and needs a native module; no buzzing in tests.
 jest.mock('react-native-haptic-feedback', () => ({trigger: jest.fn()}));
+
+// The launch screen is native; its JS hand-off never animates away in tests.
+jest.mock('react-native-bootsplash', () => ({
+  __esModule: true,
+  default: {
+    hide: jest.fn(() => Promise.resolve()),
+    isVisible: jest.fn(() => false),
+    useHideAnimation: jest.fn(() => ({
+      container: {},
+      logo: {source: 0},
+      brand: {source: 0},
+    })),
+  },
+}));

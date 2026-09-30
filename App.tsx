@@ -13,6 +13,7 @@ import {theme} from './src/constants';
 import {LibraryScreen} from './src/screens/LibraryScreen';
 import {OutfitScreen} from './src/screens/OutfitScreen';
 import {SettingsScreen} from './src/screens/SettingsScreen';
+import {SplashScreen} from './src/components/SplashScreen';
 import {TrendingScreen} from './src/screens/TrendingScreen';
 import {navigationRef} from './src/navigationRef';
 import {WardrobeProvider} from './src/state/WardrobeContext';
@@ -92,6 +93,7 @@ function App() {
             />
           </Tab.Navigator>
         </NavigationContainer>
+        <SplashScreen />
       </WardrobeProvider>
     </SafeAreaProvider>
   );
