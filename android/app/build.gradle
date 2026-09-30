@@ -79,7 +79,7 @@ android {
 
     namespace "com.wardrobe"
     defaultConfig {
-        applicationId "com.wardrobe"
+        applicationId "com.yesmesalman.wardrobe"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
