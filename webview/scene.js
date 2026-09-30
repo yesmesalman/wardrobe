@@ -141,18 +141,20 @@ const OUTFIT = {
   overlap: 0.13,
   shirtHeight: 0.74,
   pantsHeight: 1.14,
-  // Framing: the figure fills the height (with this much air) unless a wide
-  // long-sleeve shirt needs the width; the camera glides when that changes.
-  // The figure takes about half the screen width; the app shows two small
-  // previews of neighbouring garments on each side.
-  heightMargin: 1.12,
-  widthMargin: 2.0,
+  // Framing: the figure fills the height (with just enough air to keep the
+  // pants clear of the tab bar's round + button) unless a wide long-sleeve
+  // shirt needs the width; the camera glides when that changes. The shirt
+  // takes at most about three-quarters of the screen width, leaving the edges
+  // for the app's ‹ › arrows.
+  heightMargin: 1.08,
+  widthMargin: 1.3,
   defaultWidth: 0.9,
   // The pants are a little deeper than the shirt's hem; flatten them slightly
   // so the waistband stays tucked under the shirt.
   pantsDepth: 0.72,
-  // Garments slide this far sideways, in this many ms, when swapped.
-  slideDistance: 1.4,
+  // Garments slide this far sideways, in this many ms, when swapped: far
+  // enough for even a long-sleeve shirt at full width to leave the screen.
+  slideDistance: 1.5,
   slideMs: 300,
   // A dragged garment that is let go without changing springs back this fast.
   returnMs: 220,

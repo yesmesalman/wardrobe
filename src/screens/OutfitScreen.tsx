@@ -1,4 +1,4 @@
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {trigger} from 'react-native-haptic-feedback';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -11,7 +11,6 @@ import {OutfitSwipeZone} from '../components/OutfitSwipeZone';
 import {ScreenHeader} from '../components/ScreenHeader';
 import {theme} from '../constants';
 import {useWardrobeContext} from '../state/WardrobeContext';
-import type {Garment} from '../types';
 
 /** Until the scene reports where the waist falls, assume roughly here. */
 const DEFAULT_LAYOUT: OutfitLayout = {
@@ -19,10 +18,6 @@ const DEFAULT_LAYOUT: OutfitLayout = {
   shirtCentre: 0.28,
   pantsCentre: 0.75,
 };
-
-/** Up to two items on one side of `at`, nearest first. */
-const neighbours = (list: Garment[], at: number, dir: 1 | -1) =>
-  [list[at + dir], list[at + 2 * dir]].filter(Boolean);
 
 /**
  * The outfit, as if someone were wearing it: the shirt from the Library over
@@ -34,6 +29,8 @@ export function OutfitScreen() {
   const {
     wardrobe: {garments, loaded},
     startAdd,
+    wearRequest,
+    clearWearRequest,
   } = useWardrobeContext();
   const [shirtIndex, setShirtIndex] = useState(0);
   const [pantsIndex, setPantsIndex] = useState(0);
@@ -76,11 +73,30 @@ export function OutfitScreen() {
     setPantsIndex(next);
   };
 
+  // "Use" in the Library viewer: put that garment on, without a slide.
+  useEffect(() => {
+    if (!wearRequest) {
+      return;
+    }
+    const list = wearRequest.kind === 'shirt' ? shirts : pants;
+    const index = list.findIndex(g => g.id === wearRequest.id);
+    if (index >= 0) {
+      if (wearRequest.kind === 'shirt') {
+        setShirtSlide(0);
+        setShirtIndex(index);
+      } else {
+        setPantsSlide(0);
+        setPantsIndex(index);
+      }
+    }
+    clearWearRequest();
+  }, [wearRequest, shirts, pants, clearWearRequest]);
+
   const percent = (fraction: number) => `${(fraction * 100).toFixed(2)}%` as const;
 
   return (
     <View style={[styles.root, {paddingTop: insets.top}]}>
-      <ScreenHeader title="Outfit" subtitle="Swipe to mix and match" />
+      <ScreenHeader title="Outfit" subtitle="Mix and match your wardrobe" />
       <View style={styles.panel}>
         <OutfitScene
           ref={scene}
@@ -99,8 +115,6 @@ export function OutfitScreen() {
           onIndexChange={changeShirt}
           onDrag={dx => scene.current?.drag('shirt', dx)}
           onDragEnd={changed => scene.current?.endDrag('shirt', changed)}
-          previous={neighbours(shirts, shirtAt, -1)}
-          next={neighbours(shirts, shirtAt, 1)}
           centre={layout.shirtCentre / split}
           onAdd={() => startAdd('shirt')}
           style={[styles.top, {height: percent(split)}]}
@@ -113,8 +127,6 @@ export function OutfitScreen() {
           onIndexChange={changePants}
           onDrag={dx => scene.current?.drag('pants', dx)}
           onDragEnd={changed => scene.current?.endDrag('pants', changed)}
-          previous={neighbours(pants, pantsAt, -1)}
-          next={neighbours(pants, pantsAt, 1)}
           centre={(layout.pantsCentre - split) / (1 - split)}
           onAdd={() => startAdd('pants')}
           style={[styles.bottom, {top: percent(split)}]}

@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import {trigger} from 'react-native-haptic-feedback';
 import {theme} from '../constants';
-import type {Garment, GarmentKind} from '../types';
+import type {GarmentKind} from '../types';
 import {PantsIcon, ShirtIcon} from './icons';
-import {NeighbourPeek} from './NeighbourPeek';
+import {OutfitArrow} from './OutfitArrow';
 
 interface Props {
   kind: GarmentKind;
@@ -26,10 +26,7 @@ interface Props {
   onDrag?: (dx: number) => void;
   /** The finger lifted (or the swipe was cancelled); `changed` if it picked another item. */
   onDragEnd?: (changed: boolean) => void;
-  /** Up to two items before and after the current one, nearest first. */
-  previous?: Garment[];
-  next?: Garment[];
-  /** Where the garment's middle falls in this zone (0 = top, 1 = bottom). */
+  /** Where the garment's middle falls in this zone (0 = top, 1 = bottom); the arrows sit there. */
   centre?: number;
   /** Tapped on the placeholder shown when there is nothing to pick from. */
   onAdd: () => void;
@@ -93,9 +90,9 @@ const EMPTY_TITLE: Record<GarmentKind, string> = {
 };
 
 /**
- * An invisible touch area over one garment of the outfit: swipe sideways to
- * pick another from the Library. It draws only small previews of the
- * neighbouring items, or a dashed placeholder when there is nothing to show.
+ * An invisible touch area over one garment of the outfit: swipe sideways (or
+ * tap the ‹ › arrows at its edges) to pick another from the Library. It draws
+ * only the arrows, or a dashed placeholder when there is nothing to show.
  */
 export function OutfitSwipeZone({
   kind,
@@ -105,8 +102,6 @@ export function OutfitSwipeZone({
   onIndexChange,
   onDrag,
   onDragEnd,
-  previous,
-  next,
   centre = 0.5,
   onAdd,
   style,
@@ -161,26 +156,25 @@ export function OutfitSwipeZone({
 
   return (
     <View style={[styles.zone, style]} {...panResponder.panHandlers}>
-      {previous?.map((g, i) => (
-        <NeighbourPeek
-          key={g.id}
-          garment={g}
-          side="left"
-          distance={(i + 1) as 1 | 2}
-          centre={centre}
-          onPress={() => onIndexChange(index - (i + 1))}
-        />
-      ))}
-      {next?.map((g, i) => (
-        <NeighbourPeek
-          key={g.id}
-          garment={g}
-          side="right"
-          distance={(i + 1) as 1 | 2}
-          centre={centre}
-          onPress={() => onIndexChange(index + (i + 1))}
-        />
-      ))}
+      {/* With one item there is nowhere to go; at an end, that arrow fades. */}
+      {count > 1 ? (
+        <>
+          <OutfitArrow
+            kind={kind}
+            side="left"
+            enabled={index > 0}
+            centre={centre}
+            onPress={() => onIndexChange(index - 1)}
+          />
+          <OutfitArrow
+            kind={kind}
+            side="right"
+            enabled={index < count - 1}
+            centre={centre}
+            onPress={() => onIndexChange(index + 1)}
+          />
+        </>
+      ) : null}
     </View>
   );
 }

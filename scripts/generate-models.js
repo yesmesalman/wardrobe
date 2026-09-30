@@ -188,21 +188,25 @@ function buildShirt({long = false} = {}) {
   const TOP = 0.725;
 
   // The shoulder line slopes about 26 degrees from the collar down to the
-  // shoulder point, where the sleeve takes over.
-  const shoulder = [0.236, 0.649];
+  // shoulder point, where the sleeve takes over. The point sits as far out
+  // past the body's side as the sleeve needs, so the sleeve and the gap under
+  // the arm keep their shape.
+  const shoulder = [0.256, 0.6392];
   const SLOPE = 0.49;
   const seamY = x => shoulder[1] + (shoulder[0] - x) * SLOPE;
   const seamX = y => shoulder[0] - (y - shoulder[1]) / SLOPE;
 
   // [y, half width, half depth]. A boxy tee: straight sides from the hem up
-  // to the armpit; above that the width follows the shoulder line.
+  // to the armpit; above that the width follows the shoulder line. The body
+  // is a little wider than the pants' waist, which it covers in the Outfit
+  // view (the hem hangs 0.13 below the waistband there).
   const torso = [
-    [0.0, 0.2, 0.096],
-    [0.42, 0.2, 0.098],
-    [0.64, 0.205, 0.098],
-    [0.667, 0.205, 0.092],
-    [0.685, 0.205, 0.078],
-    [0.712, 0.205, 0.064],
+    [0.0, 0.22, 0.096],
+    [0.42, 0.22, 0.098],
+    [0.64, 0.225, 0.098],
+    [0.667, 0.225, 0.092],
+    [0.685, 0.225, 0.078],
+    [0.712, 0.225, 0.064],
     [TOP, 0.09, 0.06],
   ];
 

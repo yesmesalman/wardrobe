@@ -15,7 +15,7 @@ import {KIND_LABELS, MAX_PER_KIND} from '../constants';
 import {PhotoSource, pickPhoto} from '../hooks/pickPhoto';
 import {navigationRef} from '../navigationRef';
 import {useWardrobe} from '../hooks/useWardrobe';
-import type {GarmentKind} from '../types';
+import type {Garment, GarmentKind} from '../types';
 
 type Wardrobe = ReturnType<typeof useWardrobe>;
 
@@ -29,6 +29,11 @@ interface WardrobeContextValue {
    * Pass a kind to skip the shirt/pants chooser.
    */
   startAdd: (kind?: GarmentKind) => void;
+  /** Puts a garment on the Outfit figure and shows the Outfit screen. */
+  wear: (garment: Garment) => void;
+  /** The garment `wear` asked for, until the Outfit screen has put it on. */
+  wearRequest: Garment | null;
+  clearWearRequest: () => void;
 }
 
 const WardrobeContext = createContext<WardrobeContextValue | null>(null);
@@ -51,6 +56,7 @@ const errorMessage = (e: unknown) =>
 export function WardrobeProvider({children}: {children: ReactNode}) {
   const wardrobe = useWardrobe();
   const [libraryTab, setLibraryTab] = useState<GarmentKind>('shirt');
+  const [wearRequest, setWearRequest] = useState<Garment | null>(null);
   const [chooserOpen, setChooserOpen] = useState(false);
   const [draft, setDraft] = useState<{kind: GarmentKind; photo: string} | null>(
     null,
@@ -123,11 +129,28 @@ export function WardrobeProvider({children}: {children: ReactNode}) {
     }
   };
 
+  const wear = useCallback((garment: Garment) => {
+    setWearRequest(garment);
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('Outfit' as never);
+    }
+  }, []);
+
+  const clearWearRequest = useCallback(() => setWearRequest(null), []);
+
   const value = useMemo(
-    () => ({wardrobe, libraryTab, setLibraryTab, startAdd}),
+    () => ({
+      wardrobe,
+      libraryTab,
+      setLibraryTab,
+      startAdd,
+      wear,
+      wearRequest,
+      clearWearRequest,
+    }),
     // startAdd only reads the latest wardrobe, which is already a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wardrobe, libraryTab],
+    [wardrobe, libraryTab, wear, wearRequest, clearWearRequest],
   );
 
   const modalProps = (kind: GarmentKind) => ({

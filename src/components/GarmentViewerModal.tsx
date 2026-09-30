@@ -10,9 +10,11 @@ interface Props {
   garment: Garment | null;
   onClose: () => void;
   onDelete: (garment: Garment) => void;
+  /** Wear this garment in the Outfit view. */
+  onUse: (garment: Garment) => void;
 }
 
-export function GarmentViewerModal({garment, onClose, onDelete}: Props) {
+export function GarmentViewerModal({garment, onClose, onDelete, onUse}: Props) {
   const insets = useSafeAreaInsets();
   const [photo, setPhoto] = useState<Photo | null>(null);
 
@@ -68,12 +70,19 @@ export function GarmentViewerModal({garment, onClose, onDelete}: Props) {
           <Pressable onPress={onClose} hitSlop={12}>
             <Text style={styles.action}>Done</Text>
           </Pressable>
-          <Text style={styles.title}>
+          <Text style={styles.title} numberOfLines={1}>
             {garment ? VARIANT_LABELS[garment.variant] : ''}
           </Text>
-          <Pressable onPress={confirmDelete} hitSlop={12}>
-            <Text style={[styles.action, styles.danger]}>Delete</Text>
-          </Pressable>
+          <View style={styles.actions}>
+            <Pressable
+              onPress={() => garment && onUse(garment)}
+              hitSlop={12}>
+              <Text style={styles.action}>Use</Text>
+            </Pressable>
+            <Pressable onPress={confirmDelete} hitSlop={12}>
+              <Text style={[styles.action, styles.danger]}>Delete</Text>
+            </Pressable>
+          </View>
         </View>
         {garment ? (
           <GarmentView
@@ -103,7 +112,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
   },
-  title: {fontSize: 17, fontWeight: '700', color: theme.ink},
+  title: {
+    flexShrink: 1,
+    marginHorizontal: 12,
+    fontSize: 17,
+    fontWeight: '700',
+    color: theme.ink,
+  },
+  actions: {flexDirection: 'row', gap: 20},
   action: {fontSize: 16, color: theme.accent, fontWeight: '500'},
   danger: {color: theme.danger},
   scene: {flex: 1, marginHorizontal: 16, borderRadius: 24},

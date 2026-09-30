@@ -105,3 +105,18 @@ export const ChevronIcon = (props: IconProps) => (
     <Path d="M9 5 L16 12 L9 19" />
   </Icon>
 );
+
+export const CheckIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <Path d="M5 12.5 L10 17.5 L19 7" />
+  </Icon>
+);
+
+/** Three dots in a row, for a menu of more actions. */
+export const MoreIcon = ({color = '#000', ...props}: IconProps) => (
+  <Icon {...props} color={color}>
+    <Circle cx="5" cy="12" r="1.2" fill={color} />
+    <Circle cx="12" cy="12" r="1.2" fill={color} />
+    <Circle cx="19" cy="12" r="1.2" fill={color} />
+  </Icon>
+);
