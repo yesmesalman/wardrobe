@@ -19,7 +19,7 @@ import {
   theme,
   VARIANTS,
 } from '../constants';
-import type {Align, GarmentKind, Variant} from '../types';
+import type {Align, GarmentKind, GarmentShape, Variant} from '../types';
 import {Cutout, GarmentView, GarmentViewHandle, Photo} from './GarmentView';
 import {SegmentedControl} from './SegmentedControl';
 import {ZoomControl} from './ZoomControl';
@@ -29,6 +29,8 @@ export interface GarmentDraft {
   variant: Variant;
   color: string;
   align: Align;
+  /** Proportions measured from the photo, or null for the default model. */
+  shape: GarmentShape | null;
   /** Base64 PNG of the garment cut out of the photo. */
   cutoutBase64: string;
   thumbBase64: string;
@@ -53,8 +55,10 @@ const errorMessage = (e: unknown) =>
   e instanceof Error ? e.message : 'Something went wrong.';
 
 /**
- * Add screen shared by shirts and pants: the photographed garment is cut out
- * and fitted onto the blank 3D model of the chosen variant.
+ * Add screen shared by shirts and pants: the photographed garment is cut out,
+ * the blank 3D model is reshaped to its proportions (length, sleeves or legs),
+ * and the photo is fitted onto it. The variant that matches the photo is
+ * picked to start with.
  */
 export function AddGarmentModal({
   kind,
@@ -103,13 +107,16 @@ export function AddGarmentModal({
     setProcessing(true);
     setNotice(null);
     view.current
-      ?.processPhoto(photoBase64, removeBackground)
+      ?.processPhoto(photoBase64, removeBackground, kind)
       .then(result => {
         if (cancelled) {
           return;
         }
         setCutout(result);
         setAlign(DEFAULT_ALIGN);
+        if (result.variant) {
+          setVariant(result.variant);
+        }
         if (removeBackground && !result.removed) {
           setNotice(
             "Couldn't find the garment's outline, so the whole photo is used. Try a plain background.",
@@ -121,7 +128,7 @@ export function AddGarmentModal({
     return () => {
       cancelled = true;
     };
-  }, [photoBase64, removeBackground]);
+  }, [photoBase64, removeBackground, kind]);
 
   const shownPhoto: Photo | null = cutout && {
     base64: cutout.base64,
@@ -144,6 +151,7 @@ export function AddGarmentModal({
         variant,
         color,
         align,
+        shape: cutout.shape,
         cutoutBase64: cutout.base64,
         thumbBase64,
       });
@@ -178,6 +186,7 @@ export function AddGarmentModal({
           <GarmentView
             ref={view}
             variant={variant}
+            shape={cutout?.shape}
             color={color}
             photo={shownPhoto}
             mode="fit"

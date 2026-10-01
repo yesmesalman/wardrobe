@@ -3,44 +3,35 @@
 /**
  * 3D garment scene that runs inside the app's WebView.
  *
- * It renders one of the blank garment models (.glb) and shows the user's
- * photo on it in one of two modes:
+ * It renders a blank garment (built by garmentGeometry.js, reshaped to match
+ * the garment in the user's photo) and shows the photo on it in one of two
+ * modes:
  *   - "fit":   the garment cut out of the photo is projected over the whole
  *              model (front only; the back and sides use the fabric colour)
  *   - "print": the photo is a small decal on the chest / thigh
  *
  * React Native drives it through these globals:
- *   __setGarment({variant, photo, mode, align})  swap model / photo / mode
+ *   __setGarment({variant, shape, photo, mode, align})  swap model / photo / mode
  *       variant: 'short-sleeve' | 'long-sleeve' | 'long-pants' | 'shorts'
+ *       shape:   the garment's measured proportions, or null for the defaults
  *   __setColor(hex)                           fabric colour
  *   __setOutfit({shirt, pants})               show a shirt over pants, as if worn
- *       each: null or {id, variant, photo, mode, color, align, slide}
+ *       each: null or {id, variant, shape, photo, mode, color, align, slide}
  *   __dragOutfit(part, px)                    move 'shirt' / 'pants' with a finger
  *   __releaseOutfit(part)                     let a dragged garment spring back
  *   __setAutoRotate(bool)
  *   __setView('3d' | 'align')                 3D view or 2D alignment view
  *   __setAlign({sx, sy, ox, oy}), __zoomAlign(factor), __resetAlign()
- *   __processPhoto(id, dataUrl, removeBackground)  cut the garment out
+ *   __processPhoto(id, dataUrl, removeBackground, kind)  cut the garment out
+ *       and measure its shape ('shirt' | 'pants')
  *   __snapshot(id)                            JPEG still for library cards
  * and reports back with window.ReactNativeWebView.postMessage.
  *
  * Bundled by scripts/build-webview.js into src/webview/sceneHtml.ts.
  */
 import * as THREE from 'three';
-import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {DecalGeometry} from 'three/examples/jsm/geometries/DecalGeometry.js';
-import shirtModel from '../src/assets/models/blank_shirt.glb';
-import longShirtModel from '../src/assets/models/blank_shirt_long.glb';
-import pantsModel from '../src/assets/models/blank_pants.glb';
-import shortsModel from '../src/assets/models/blank_shorts.glb';
-
-// Blank models by variant (base64, embedded by the bundler).
-const MODEL_DATA = {
-  'short-sleeve': shirtModel,
-  'long-sleeve': longShirtModel,
-  'long-pants': pantsModel,
-  shorts: shortsModel,
-};
+import {buildGarment, PANTS, resolveShape, SHIRT} from './garmentGeometry.js';
 
 // The app can match its own screen colour by setting window.__BACKGROUND first.
 const BACKGROUND = window.__BACKGROUND || '#ece7df';
@@ -115,8 +106,7 @@ scene.add(alignPlane);
 // State
 // ---------------------------------------------------------------------------
 
-const loader = new GLTFLoader();
-const models = {}; // variant -> {geometry, anchor, size, bbox}
+const models = {}; // variant + shape -> {geometry, anchor, size, bbox}
 const state = {
   variant: null,
   outfit: false,
@@ -160,38 +150,35 @@ const OUTFIT = {
   returnMs: 220,
 };
 
-function loadModel(variant) {
-  if (models[variant]) {
-    return Promise.resolve(models[variant]);
+/** The blank garment for a variant, fitted to a measured shape (cached). */
+function loadModel(variant, shape) {
+  const id = `${variant}:${JSON.stringify(resolveShape(variant, shape))}`;
+  if (!models[id]) {
+    const {mesh, decal} = buildGarment(variant, shape);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(new Float32Array(mesh.positions.flat()), 3),
+    );
+    geometry.setAttribute(
+      'normal',
+      new THREE.BufferAttribute(new Float32Array(mesh.normals.flat()), 3),
+    );
+    geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(mesh.indices), 1));
+    geometry.computeBoundingBox();
+    const box = geometry.boundingBox;
+    const dims = box.getSize(new THREE.Vector3());
+    const centre = box.getCenter(new THREE.Vector3());
+    models[id] = {
+      geometry,
+      anchor: decal,
+      // Yaw changes the visible width, so frame the wider horizontal side.
+      size: {width: Math.max(dims.x, dims.z), height: dims.y},
+      // Front-on extent, used to fit a photo over the model.
+      bbox: {cx: centre.x, cy: centre.y, W: dims.x, H: dims.y},
+    };
   }
-  const base64 = MODEL_DATA[variant] || MODEL_DATA['short-sleeve'];
-  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-  return new Promise((resolve, reject) =>
-    loader.parse(
-      bytes.buffer,
-      '',
-      gltf => {
-        let mesh = null;
-        gltf.scene.traverse(o => {
-          mesh = mesh || (o.isMesh ? o : null);
-        });
-        mesh.geometry.computeBoundingBox();
-        const box = mesh.geometry.boundingBox;
-        const dims = box.getSize(new THREE.Vector3());
-        const centre = box.getCenter(new THREE.Vector3());
-        models[variant] = {
-          geometry: mesh.geometry,
-          anchor: mesh.userData.decal,
-          // Yaw changes the visible width, so frame the wider horizontal side.
-          size: {width: Math.max(dims.x, dims.z), height: dims.y},
-          // Front-on extent, used to fit a photo over the model.
-          bbox: {cx: centre.x, cy: centre.y, W: dims.x, H: dims.y},
-        };
-        resolve(models[variant]);
-      },
-      reject,
-    ),
-  );
+  return Promise.resolve(models[id]);
 }
 
 function loadTexture(dataUrl) {
@@ -387,10 +374,10 @@ function createGarment(model, texture, mode, color, align) {
   return {group, material, uniforms, texture: fit ? texture : null, model};
 }
 
-async function setGarment({variant, photo, mode, align}) {
+async function setGarment({variant, shape, photo, mode, align}) {
   const request = ++state.request;
   try {
-    const model = await loadModel(variant);
+    const model = await loadModel(variant, shape);
     const texture = photo ? await loadTexture(photo) : null;
     if (request !== state.request) {
       texture && texture.dispose();
@@ -418,6 +405,9 @@ async function setGarment({variant, photo, mode, align}) {
   }
 }
 
+/** Identifies what an outfit garment shows, so an unchanged one is kept. */
+const outfitKey = spec => `${spec.id}:${JSON.stringify(spec.shape || null)}`;
+
 /**
  * Shows a shirt over pants at their natural positions, as if worn. Only the
  * parts whose garment changed are rebuilt. A changed part slides in from the
@@ -433,13 +423,13 @@ async function setOutfit(specs) {
         if (!spec) {
           return {part, spec: null};
         }
-        if (outfit[part] && outfit[part].key === spec.id) {
+        if (outfit[part] && outfit[part].key === outfitKey(spec)) {
           return {part, keep: true};
         }
         return {
           part,
           spec,
-          model: await loadModel(spec.variant),
+          model: await loadModel(spec.variant, spec.shape),
           texture: spec.photo ? await loadTexture(spec.photo) : null,
         };
       }),
@@ -482,7 +472,7 @@ async function setOutfit(specs) {
         item.spec.color,
         item.spec.align,
       );
-      g.key = item.spec.id;
+      g.key = outfitKey(item.spec);
       const height = item.model.size.height;
       // Models are centred on their own bounding box; hang them from the waist.
       g.group.position.y =
@@ -643,8 +633,14 @@ function placeOutfitCamera() {
 function fitCamera() {
   const half = Math.tan((FOV * Math.PI) / 360);
   if (state.outfit) {
-    const top = -OUTFIT.overlap + OUTFIT.shirtHeight;
-    const bottom = -OUTFIT.pantsHeight;
+    const shirtHeight = outfit.shirt
+      ? outfit.shirt.model.size.height
+      : OUTFIT.shirtHeight;
+    const pantsHeight = outfit.pants
+      ? outfit.pants.model.size.height
+      : OUTFIT.pantsHeight;
+    const top = -OUTFIT.overlap + shirtHeight;
+    const bottom = -pantsHeight;
     const width = outfit.shirt
       ? outfit.shirt.model.size.width
       : OUTFIT.defaultWidth;
@@ -663,12 +659,6 @@ function fitCamera() {
     // the app can split its touch zones there.
     const screenY = y =>
       (1 - (y - outfitCam.tCentre) / (outfitCam.tDistance * half)) / 2;
-    const shirtHeight = outfit.shirt
-      ? outfit.shirt.model.size.height
-      : OUTFIT.shirtHeight;
-    const pantsHeight = outfit.pants
-      ? outfit.pants.model.size.height
-      : OUTFIT.pantsHeight;
     post({
       type: 'outfitLayout',
       split: screenY(0),
@@ -1150,20 +1140,228 @@ function cutOut(image) {
     data: out.toDataURL('image/png'),
     color: dominantColour(data, w, h, mask),
     removed: true,
+    outline: {mask, w, h, box: {x0, y0, x1, y1}},
   };
 }
 
-async function processPhoto(id, dataUrl, removeBackground) {
+// ---------------------------------------------------------------------------
+// Measuring the garment's shape from its outline
+// ---------------------------------------------------------------------------
+
+const median = values => {
+  const v = [...values].sort((a, b) => a - b);
+  return v.length ? v[v.length >> 1] : NaN;
+};
+
+/** Median of `fn(y)` over the rows from fraction `from` to `to` of the box. */
+function overRows(box, from, to, fn) {
+  const height = box.y1 - box.y0 + 1;
+  const values = [];
+  for (
+    let y = Math.round(box.y0 + from * height);
+    y <= Math.round(box.y0 + to * height);
+    y++
+  ) {
+    const v = fn(y);
+    v !== null && values.push(v);
+  }
+  return values;
+}
+
+/** Runs of garment pixels in a row, as [first, last] columns. */
+function runsInRow({mask, w}, y) {
+  const runs = [];
+  let start = -1;
+  for (let x = 0; x <= w; x++) {
+    const on = x < w && mask[y * w + x];
+    if (on && start < 0) {
+      start = x;
+    } else if (!on && start >= 0) {
+      // Ignore specks (a loose thread, a speck of the background).
+      x - start > 2 && runs.push([start, x - 1]);
+      start = -1;
+    }
+  }
+  return runs;
+}
+
+/**
+ * A flat-lay shirt: its body is as wide as the model's, which sets the scale;
+ * from that, its length and each sleeve's length and angle. Sleeves are
+ * followed from the model's shoulder point to the end of the garment pixels
+ * beyond the body's sides.
+ */
+function measureShirt(outline) {
+  const {mask, w} = outline;
+  // Measure to the hem in the middle: long sleeves may hang lower.
+  const centreGuess = Math.round((outline.box.x0 + outline.box.x1) / 2);
+  let hem = outline.box.y1;
+  while (hem > outline.box.y0 && !mask[hem * w + centreGuess]) {
+    hem--;
+  }
+  const box = {...outline.box, y1: hem};
+  const height = box.y1 - box.y0 + 1;
+  // The body's width near the hem, where the sleeves don't reach.
+  const hemRuns = overRows(box, 0.85, 0.97, y => {
+    const run = runsInRow(outline, y).find(
+      ([a, b]) => a <= centreGuess && b >= centreGuess,
+    );
+    return run || null;
+  });
+  if (hemRuns.length < 3) {
+    return null;
+  }
+  const bodyWidth = median(hemRuns.map(([a, b]) => b - a + 1));
+  const cx = median(hemRuns.map(([a, b]) => (a + b) / 2));
+  const k = bodyWidth / (2 * SHIRT.flatHalfWidth); // pixels per model unit
+  const length = height / k;
+
+  // Garment pixels beyond the body's sides, in model units: X outwards from
+  // the centre, Y up from the hem.
+  const sleeve = side => {
+    const points = [];
+    // Clear of the body's sides, so a hem that flares a little isn't taken
+    // for a sleeve.
+    const beyond = bodyWidth / 2 + Math.max(2, 0.03 * k);
+    const yEnd = outline.box.y1;
+    for (let y = box.y0; y <= yEnd; y++) {
+      for (let x = box.x0; x <= box.x1; x++) {
+        if (mask[y * w + x] && side * (x - cx) > beyond) {
+          points.push([(side * (x - cx)) / k, (box.y1 - y) / k]);
+        }
+      }
+    }
+    // Too few to be a sleeve (a sleeveless top, or a crease at the side).
+    if (points.length < 0.002 * bodyWidth * height) {
+      return null;
+    }
+    const shoulder = [SHIRT.shoulderX, length - SHIRT.shoulderDrop];
+    let angle = 46 * (Math.PI / 180);
+    let reach = 0;
+    // Refine the sleeve's axis: from its root to the middle of its cuff.
+    for (let pass = 0; pass < 3; pass++) {
+      const dir = [Math.cos(angle), -Math.sin(angle)];
+      const up = [Math.sin(angle), Math.cos(angle)];
+      const root = [
+        shoulder[0] - up[0] * SHIRT.sleeveRadius,
+        shoulder[1] - up[1] * SHIRT.sleeveRadius,
+      ];
+      const along = points.map(
+        ([x, y]) => (x - root[0]) * dir[0] + (y - root[1]) * dir[1],
+      );
+      reach = along.reduce((m, v) => Math.max(m, v), -Infinity);
+      let sx = 0;
+      let sy = 0;
+      let n = 0;
+      points.forEach(([x, y], i) => {
+        if (along[i] >= 0.85 * reach) {
+          sx += x;
+          sy += y;
+          n++;
+        }
+      });
+      if (!n || reach <= 0) {
+        return null;
+      }
+      angle = Math.atan2(root[1] - sy / n, sx / n - root[0]);
+    }
+    return {sleeveLength: reach, sleeveAngle: angle / (Math.PI / 180)};
+  };
+  const sleeves = [sleeve(1), sleeve(-1)].filter(Boolean);
+  const shape = {length};
+  if (sleeves.length) {
+    const mean = name =>
+      sleeves.reduce((sum, s) => sum + s[name], 0) / sleeves.length;
+    shape.sleeveLength = mean('sleeveLength');
+    shape.sleeveAngle = mean('sleeveAngle');
+  }
+  return {
+    shape,
+    variant:
+      shape.sleeveLength !== undefined && shape.sleeveLength > 0.38
+        ? 'long-sleeve'
+        : 'short-sleeve',
+  };
+}
+
+/**
+ * Flat-lay pants: the waist is as wide as the model's, which sets the scale;
+ * from that, the length, the rise (waist to crotch) and the legs at the hem.
+ */
+function measurePants(outline) {
+  const {mask, w, box} = outline;
+  const height = box.y1 - box.y0 + 1;
+  const waistRuns = overRows(box, 0.02, 0.08, y => {
+    const runs = runsInRow(outline, y);
+    return runs.length ? [runs[0][0], runs[runs.length - 1][1]] : null;
+  });
+  if (waistRuns.length < 2) {
+    return null;
+  }
+  const waistWidth = median(waistRuns.map(([a, b]) => b - a + 1));
+  const cx = Math.round(median(waistRuns.map(([a, b]) => (a + b) / 2)));
+  const k = waistWidth / (2 * PANTS.waistHalf);
+  const shape = {length: height / k};
+
+  // The crotch: the first gap down the middle, below the waistband.
+  for (let y = Math.round(box.y0 + 0.1 * height); y <= box.y1; y++) {
+    const open = [-1, 0, 1].filter(d => !mask[y * w + cx + d]).length;
+    if (open >= 2) {
+      shape.rise = (y - box.y0) / k - PANTS.crotchGap;
+      break;
+    }
+  }
+
+  // The legs at the hem: the outermost runs a little above the bottom.
+  const hems = overRows(box, 0.93, 0.97, y => {
+    const runs = runsInRow(outline, y);
+    if (!runs.length) {
+      return null;
+    }
+    const left = runs[0];
+    const right = runs[runs.length - 1];
+    const outer = (cx - left[0] + (right[1] - cx)) / 2;
+    // One run: the legs touch at the hem, each is half of it.
+    const half =
+      runs.length > 1
+        ? (left[1] - left[0] + 1 + (right[1] - right[0] + 1)) / 4
+        : outer / 2;
+    return [outer, half];
+  });
+  if (hems.length) {
+    shape.hemOuter = median(hems.map(([outer]) => outer)) / k - PANTS.hemFolds;
+    shape.hemHalf = median(hems.map(([, half]) => half)) / k - PANTS.hemFolds;
+  }
+  return {
+    shape,
+    variant: shape.length > 0.92 ? 'long-pants' : 'shorts',
+  };
+}
+
+async function processPhoto(id, dataUrl, removeBackground, kind) {
   try {
     const image = await loadImage(dataUrl);
     const result =
       (removeBackground && cutOut(image)) || wholePhoto(image);
+    let measured = null;
+    if (result.outline) {
+      try {
+        measured =
+          kind === 'pants'
+            ? measurePants(result.outline)
+            : measureShirt(result.outline);
+      } catch {
+        measured = null; // keep the cut-out; the default shape is used
+      }
+    }
     post({
       type: 'cutout',
       id,
       data: result.data,
       color: result.color,
       removed: result.removed,
+      shape: measured ? measured.shape : null,
+      variant: measured ? measured.variant : null,
     });
   } catch (e) {
     post({

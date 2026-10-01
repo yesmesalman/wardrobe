@@ -1,11 +1,10 @@
 /**
- * Bundles webview/scene.js (three.js + the blank garment models) into one
+ * Bundles webview/scene.js (three.js + the garment geometry) into one
  * self-contained HTML string for the app's WebView:
  *   src/webview/sceneHtml.ts
  *
- * Run `npm run generate:models` first if the models changed, then
- * `npm run build:webview`. The output is committed so the app needs no
- * bundling step at runtime.
+ * Run `npm run build:webview` after changing anything in webview/. The output
+ * is committed so the app needs no bundling step at runtime.
  */
 const fs = require('fs');
 const path = require('path');
@@ -21,7 +20,6 @@ const {outputFiles} = esbuild.buildSync({
   format: 'iife',
   target: 'es2020',
   write: false,
-  loader: {'.glb': 'base64'},
   legalComments: 'none',
 });
 

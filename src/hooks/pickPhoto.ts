@@ -9,7 +9,7 @@ import {
 export type PhotoSource = 'camera' | 'library';
 
 /** Longest side, in pixels, of a stored photo (keeps the texture small). */
-const MAX_PHOTO_SIZE = 1024;
+export const MAX_PHOTO_SIZE = 1024;
 
 const OPTIONS: CameraOptions = {
   mediaType: 'photo',

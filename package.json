@@ -7,7 +7,6 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "generate:models": "node scripts/generate-models.js",
     "build:webview": "node scripts/build-webview.js",
     "test": "jest"
   },
@@ -21,9 +20,12 @@
     "react-native-bootsplash": "^7.3.4",
     "react-native-haptic-feedback": "^3.0.0",
     "react-native-image-picker": "^8.2.1",
+    "react-native-nitro-image": "^0.15.2",
+    "react-native-nitro-modules": "^0.37.1",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.28.0",
     "react-native-svg": "^15.15.5",
+    "react-native-vision-camera": "^5.2.3",
     "react-native-webview": "^14.0.1"
   },
   "devDependencies": {

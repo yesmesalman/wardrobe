@@ -76,6 +76,15 @@ export function readFileBase64(fileName: string): Promise<string> {
   return readFile(filePath(fileName), 'base64');
 }
 
+/** Reads a temporary file (e.g. a fresh camera photo) as base64, then deletes it. */
+export async function takeTempFileBase64(path: string): Promise<string> {
+  try {
+    return await readFile(path, 'base64');
+  } finally {
+    unlink(path).catch(() => {});
+  }
+}
+
 export async function deleteGarmentFiles(garment: Garment): Promise<void> {
   const names = [garment.photoFile, garment.thumbFile, garment.cutoutFile];
   await Promise.all(

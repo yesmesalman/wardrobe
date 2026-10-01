@@ -9,7 +9,7 @@ import React, {
 import {ActivityIndicator, StyleSheet, View, ViewStyle} from 'react-native';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
 import {DEFAULT_ALIGN, theme} from '../constants';
-import type {Align, PhotoMode, Variant} from '../types';
+import type {Align, GarmentKind, GarmentShape, PhotoMode, Variant} from '../types';
 import {SCENE_HTML} from '../webview/sceneHtml';
 
 export interface Photo {
@@ -24,13 +24,21 @@ export interface Cutout {
   color: string;
   /** False when the background could not be removed (whole photo used). */
   removed: boolean;
+  /** The garment's proportions, measured from its outline (if it was found). */
+  shape: GarmentShape | null;
+  /** The variant those proportions look like (e.g. long sleeves). */
+  variant: Variant | null;
 }
 
 export interface GarmentViewHandle {
   /** Base64 JPEG still of the garment, in the pose used on library cards. */
   snapshot: () => Promise<string>;
-  /** Cuts the garment out of a photo (base64 JPEG) for "fit" mode. */
-  processPhoto: (photoBase64: string, removeBackground: boolean) => Promise<Cutout>;
+  /** Cuts the garment out of a photo (base64 JPEG) for "fit" mode and measures it. */
+  processPhoto: (
+    photoBase64: string,
+    removeBackground: boolean,
+    kind: GarmentKind,
+  ) => Promise<Cutout>;
   /** Puts the photo back to the automatic fit. */
   resetAlign: () => void;
   /** Zooms the photo over the model by `factor` (1.1 = 10% bigger). */
@@ -39,6 +47,8 @@ export interface GarmentViewHandle {
 
 interface Props {
   variant: Variant;
+  /** Reshapes the blank model to the garment's measured proportions. */
+  shape?: GarmentShape | null;
   color: string;
   /** Fit mode: the cut-out (PNG). Print mode: the photo (JPEG). */
   photo?: Photo | null;
@@ -73,6 +83,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
   function GarmentViewImpl(
     {
       variant,
+      shape = null,
       color,
       photo,
       mode = 'print',
@@ -98,6 +109,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
 
     // Model, photo and mode: the page swaps the garment when any changes.
     const photoUri = photo ? `data:${photo.mime};base64,${photo.base64}` : null;
+    const shapeJson = JSON.stringify(shape);
     const initialAlign = useRef(align);
     initialAlign.current = align;
     useEffect(() => {
@@ -106,13 +118,14 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
         run(
           `window.__setGarment(${JSON.stringify({
             variant,
+            shape: JSON.parse(shapeJson),
             photo: photoUri,
             mode,
             align: initialAlign.current,
           })})`,
         );
       }
-    }, [ready, variant, photoUri, mode, run]);
+    }, [ready, variant, shapeJson, photoUri, mode, run]);
 
     useEffect(() => {
       if (ready) {
@@ -166,7 +179,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
             'Timed out capturing the 3D preview.',
             id => run(`window.__snapshot(${JSON.stringify(id)})`),
           ),
-        processPhoto: async (photoBase64, removeBackground) => {
+        processPhoto: async (photoBase64, removeBackground, kind) => {
           // The page may still be starting up.
           await new Promise<void>(resolve => {
             if (ready) {
@@ -182,7 +195,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
               run(
                 `window.__processPhoto(${JSON.stringify(id)}, ${JSON.stringify(
                   `data:image/jpeg;base64,${photoBase64}`,
-                )}, ${removeBackground})`,
+                )}, ${removeBackground}, ${JSON.stringify(kind)})`,
               ),
           );
         },
@@ -226,6 +239,8 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
               base64: stripDataUrl(message.data),
               color: message.color,
               removed: message.removed,
+              shape: message.shape ?? null,
+              variant: message.variant ?? null,
             } satisfies Cutout);
             break;
           case 'snapshotError':

@@ -20,6 +20,7 @@ jest.mock('../src/storage/wardrobeStorage', () => ({
   saveGarments: jest.fn(() => Promise.resolve()),
   saveGarmentFiles: jest.fn(),
   readFileBase64: jest.fn(),
+  takeTempFileBase64: jest.fn(),
   deleteGarmentFiles: jest.fn(),
   deleteAllData: jest.fn(() => Promise.resolve()),
   fileUri: jest.fn((name: string) => `file:///garments/${name}`),

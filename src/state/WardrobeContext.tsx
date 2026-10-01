@@ -11,8 +11,9 @@ import {AddItemSheet} from '../components/AddItemSheet';
 import {AddPantsModal} from '../components/AddPantsModal';
 import {AddShirtModal} from '../components/AddShirtModal';
 import type {GarmentDraft} from '../components/AddGarmentModal';
+import {GuidedCamera} from '../components/GuidedCamera';
 import {KIND_LABELS, MAX_PER_KIND} from '../constants';
-import {PhotoSource, pickPhoto} from '../hooks/pickPhoto';
+import {pickPhoto} from '../hooks/pickPhoto';
 import {navigationRef} from '../navigationRef';
 import {useWardrobe} from '../hooks/useWardrobe';
 import type {Garment, GarmentKind} from '../types';
@@ -25,8 +26,9 @@ interface WardrobeContextValue {
   libraryTab: GarmentKind;
   setLibraryTab: (kind: GarmentKind) => void;
   /**
-   * Starts the add flow: choose shirt/pants, pick a photo, add the item.
-   * Pass a kind to skip the shirt/pants chooser.
+   * Starts the add flow: choose shirt/pants, photograph it with the guided
+   * camera (or pick a photo), add the item. Pass a kind to skip the
+   * shirt/pants chooser.
    */
   startAdd: (kind?: GarmentKind) => void;
   /** Puts a garment on the Outfit figure and shows the Outfit screen. */
@@ -58,13 +60,14 @@ export function WardrobeProvider({children}: {children: ReactNode}) {
   const [libraryTab, setLibraryTab] = useState<GarmentKind>('shirt');
   const [wearRequest, setWearRequest] = useState<Garment | null>(null);
   const [chooserOpen, setChooserOpen] = useState(false);
+  const [cameraKind, setCameraKind] = useState<GarmentKind | null>(null);
   const [draft, setDraft] = useState<{kind: GarmentKind; photo: string} | null>(
     null,
   );
 
-  const capture = useCallback(async (kind: GarmentKind, source: PhotoSource) => {
+  const pickFromLibrary = useCallback(async (kind: GarmentKind) => {
     try {
-      const photo = await pickPhoto(source);
+      const photo = await pickPhoto('library');
       if (photo) {
         setDraft({kind, photo});
       }
@@ -73,34 +76,36 @@ export function WardrobeProvider({children}: {children: ReactNode}) {
     }
   }, []);
 
-  const chooseSource = useCallback(
-    (kind: GarmentKind) => {
-      Alert.alert(
-        `Add ${KIND_LABELS[kind].singular.toLowerCase()}`,
-        'Photograph it or pick a photo.',
-        [
-          {text: 'Take photo', onPress: () => capture(kind, 'camera')},
-          {text: 'Choose from library', onPress: () => capture(kind, 'library')},
-          {text: 'Cancel', style: 'cancel'},
-        ],
-      );
-    },
-    [capture],
-  );
-
-  // Let a modal finish dismissing before the next system dialog appears.
+  // Let a modal finish dismissing before the next one (or a system dialog)
+  // appears.
   const afterModal = (action: () => void) => setTimeout(action, 400);
 
   const choose = (kind: GarmentKind) => {
     setChooserOpen(false);
-    afterModal(() => chooseSource(kind));
+    afterModal(() => setCameraKind(kind));
   };
 
   const retake = () => {
     if (draft) {
       const {kind} = draft;
       setDraft(null);
-      afterModal(() => chooseSource(kind));
+      afterModal(() => setCameraKind(kind));
+    }
+  };
+
+  const captured = (photo: string) => {
+    if (cameraKind) {
+      const kind = cameraKind;
+      setCameraKind(null);
+      afterModal(() => setDraft({kind, photo}));
+    }
+  };
+
+  const libraryInstead = () => {
+    if (cameraKind) {
+      const kind = cameraKind;
+      setCameraKind(null);
+      afterModal(() => pickFromLibrary(kind));
     }
   };
 
@@ -125,7 +130,7 @@ export function WardrobeProvider({children}: {children: ReactNode}) {
         `You can keep up to ${MAX_PER_KIND} ${KIND_LABELS[kind].plural.toLowerCase()}.`,
       );
     } else {
-      chooseSource(kind);
+      setCameraKind(kind);
     }
   };
 
@@ -169,6 +174,12 @@ export function WardrobeProvider({children}: {children: ReactNode}) {
         counts={wardrobe.counts}
         onChoose={choose}
         onClose={() => setChooserOpen(false)}
+      />
+      <GuidedCamera
+        kind={cameraKind}
+        onCapture={captured}
+        onLibrary={libraryInstead}
+        onCancel={() => setCameraKind(null)}
       />
       <AddShirtModal {...modalProps('shirt')} />
       <AddPantsModal {...modalProps('pants')} />

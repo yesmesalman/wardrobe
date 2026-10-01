@@ -35,3 +35,15 @@ jest.mock('react-native-bootsplash', () => ({
     })),
   },
 }));
+
+// The camera is native: no device and no permission in tests.
+jest.mock('react-native-vision-camera', () => ({
+  Camera: () => null,
+  useCameraDevice: jest.fn(() => undefined),
+  useCameraPermission: jest.fn(() => ({
+    hasPermission: false,
+    canRequestPermission: false,
+    requestPermission: jest.fn(() => Promise.resolve(false)),
+  })),
+  usePhotoOutput: jest.fn(() => ({capturePhoto: jest.fn()})),
+}));

@@ -88,6 +88,7 @@ export function GarmentViewerModal({garment, onClose, onDelete, onUse}: Props) {
           <GarmentView
             key={garment.id}
             variant={garment.variant}
+            shape={garment.shape}
             color={garment.color}
             photo={photo}
             mode={garment.mode}

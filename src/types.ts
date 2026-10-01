@@ -24,6 +24,25 @@ export interface Align {
   oy: number;
 }
 
+/**
+ * The garment's proportions measured from its photo, which the blank model is
+ * reshaped to (in model units; see webview/garmentGeometry.js):
+ *  shirts: length, sleeveLength, sleeveAngle (degrees below horizontal)
+ *  pants:  length, rise, hemOuter, hemHalf
+ * Missing values use the variant's defaults.
+ */
+export type GarmentShape = Partial<
+  Record<
+    | 'length'
+    | 'sleeveLength'
+    | 'sleeveAngle'
+    | 'rise'
+    | 'hemOuter'
+    | 'hemHalf',
+    number
+  >
+>;
+
 export interface Garment {
   id: string;
   kind: GarmentKind;
@@ -38,5 +57,7 @@ export interface Garment {
   /** Fabric colour of the blank 3D model (hex). */
   color: string;
   align: Align;
+  /** Measured proportions; absent for garments saved before fitting. */
+  shape?: GarmentShape | null;
   createdAt: number;
 }

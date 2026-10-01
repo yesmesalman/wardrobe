@@ -73,6 +73,7 @@ const spec = (
         id: garment.id,
         slide,
         variant: garment.variant,
+        shape: garment.shape ?? null,
         photo: loaded.photo,
         mode: garment.mode,
         color: garment.color,
