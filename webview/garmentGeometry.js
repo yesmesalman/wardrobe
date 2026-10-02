@@ -68,13 +68,13 @@ const normalize = v => {
  * The standard garments of each body type ('man' or 'woman'), in model units.
  *
  * Shirt: the hem at y = 0, the collar's top at `length`. The body is a little
- * wider than the pants' waist, which it covers in the Outfit view. The man's
- * is a boxy tee with straight sides; the woman's has narrower shoulders, a
- * waist taper and a hem that flares a little over the hips.
+ * wider than the pants' waist, which it covers in the Outfit view: a boxy tee
+ * with straight sides.
  *
  * Pants: the waist at y = 1, the crotch point (fork) `rise` below it, the hem
- * `length` below it. The woman's have a narrower waist, fuller hips and a
- * slightly longer rise.
+ * `length` below it.
+ *
+ * The woman's models are the man's for now; they get their own shapes later.
  */
 const SHAPES = {
   man: {
@@ -151,71 +151,8 @@ const SHAPES = {
       ],
     },
   },
-  woman: {
-    shirt: {
-      length: 0.7,
-      halfWidth: 0.214,
-      hemHalf: 0.215,
-      collarHalf: 0.085,
-      shoulderX: 0.226,
-      shoulderDrop: 0.069,
-      shoulderSlope: 0.49,
-      sleeveAngle: 48,
-      sleeveRadius: 0.076,
-      sleeveLength: {short: 0.16, long: 0.57},
-      longReach: 0.36,
-      // Fitted: a slim waist and a fuller chest (wider, and pushed forward by
-      // `bust`), flaring a little at the hem (still wider than the pants'
-      // hips where it covers them).
-      armpitY: 0.6,
-      bust: {y: 0.47, depth: 0.032, spread: 0.09},
-      torso: [
-        [0.0, 0.218, 0.094],
-        [0.1, 0.212, 0.09],
-        [0.28, 0.172, 0.082],
-        [0.47, 0.222, 0.1],
-        [0.6, 0.214, 0.1],
-        [0.635, 0.214, 0.094],
-        [0.655, 0.214, 0.078],
-        [0.682, 0.214, 0.064],
-        [0.7, 0.085, 0.06],
-      ],
-    },
-    pants: {
-      waistHalf: 0.18,
-      rise: 0.36,
-      length: {long: 1.14, shorts: 0.62},
-      longLength: 0.92,
-      hips: [
-        [0.6, 0.212, 0.104],
-        [0.66, 0.234, 0.128],
-        [0.74, 0.236, 0.13],
-        [0.84, 0.212, 0.116],
-        [0.93, 0.18, 0.102],
-        [1.0, 0.176, 0.1],
-      ],
-      jeansLeg: [
-        [-0.14, 0.117, 0.046, 0.05],
-        [0.0, 0.116, 0.056, 0.057],
-        [0.2, 0.1155, 0.072, 0.07],
-        [0.4, 0.115, 0.09, 0.09],
-        [0.5, 0.1155, 0.1, 0.104],
-        [0.58, 0.115, 0.108, 0.116],
-      ],
-      shortsLeg: [
-        [0.38, 0.118, 0.094, 0.108],
-        [0.46, 0.117, 0.1, 0.112],
-        [0.54, 0.116, 0.107, 0.118],
-        [0.6, 0.116, 0.112, 0.12],
-      ],
-      upperLeg: [
-        [0.64, 0.116, 0.116, 0.124],
-        [0.7, 0.108, 0.12, 0.124],
-        [0.76, 0.104, 0.122, 0.12],
-      ],
-    },
-  },
 };
+SHAPES.woman = SHAPES.man;
 
 /** The standard shirt and pants of a body type (the man's by default). */
 const shapesOf = body => SHAPES[body] || SHAPES.man;
@@ -397,11 +334,6 @@ function buildShirt(shirt, {long = false} = {}) {
         (0.35 + 0.65 * (1 - y / TOP));
       x *= 1 + fold / w;
       z *= 1 + fold / d;
-      // A fuller chest at the front only (the back stays flat).
-      if (shirt.bust && z > 0) {
-        const {y: by, depth, spread} = shirt.bust;
-        z += depth * Math.exp(-(((y - by) / spread) ** 2)) * Math.sin(theta) ** 2;
-      }
       // Lower neckline at the front, slightly at the back.
       const s = Math.sin(theta);
       const dip =
