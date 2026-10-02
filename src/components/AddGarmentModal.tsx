@@ -204,7 +204,7 @@ export function AddGarmentModal({
         <Text style={styles.hint}>
           {aligning
             ? 'Drag to move, pinch or use − / + to zoom. Match the blue outline.'
-            : 'Drag to rotate'}
+            : 'Drag to tilt'}
         </Text>
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
@@ -252,7 +252,7 @@ export function AddGarmentModal({
             )}
           </View>
 
-          <Text style={styles.sectionLabel}>Back and sides colour</Text>
+          <Text style={styles.sectionLabel}>Fabric colour</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}

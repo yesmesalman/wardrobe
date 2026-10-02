@@ -58,8 +58,8 @@ interface Props {
   align?: Align;
   /** '3d' to look around, 'align' to line the photo up with the model. */
   view?: '3d' | 'align';
-  /** Turn slowly while untouched (dragging always spins it 360°). */
-  autoRotate?: boolean;
+  /** Sway gently while untouched (dragging always tilts it a little). */
+  sway?: boolean;
   style?: ViewStyle;
   onAlignChange?: (align: Align) => void;
   /** The page switched view by itself (e.g. before taking a snapshot). */
@@ -90,7 +90,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
       mode = 'print',
       align = DEFAULT_ALIGN,
       view = '3d',
-      autoRotate = true,
+      sway = true,
       style,
       onAlignChange,
       onViewChange,
@@ -140,9 +140,9 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
 
     useEffect(() => {
       if (ready) {
-        run(`window.__setAutoRotate(${autoRotate})`);
+        run(`window.__setSway(${sway})`);
       }
-    }, [ready, autoRotate, run]);
+    }, [ready, sway, run]);
 
     useEffect(() => {
       if (ready) {

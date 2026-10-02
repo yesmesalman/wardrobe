@@ -18,7 +18,7 @@
  *       each: null or {id, variant, photo, mode, color, align, slide}
  *   __dragOutfit(part, px)                    move 'shirt' / 'pants' with a finger
  *   __releaseOutfit(part)                     let a dragged garment spring back
- *   __setAutoRotate(bool)
+ *   __setSway(bool)                           sway gently while untouched
  *   __setView('3d' | 'align')                 3D view or 2D alignment view
  *   __setAlign({sx, sy, ox, oy}), __zoomAlign(factor), __resetAlign()
  *   __processPhoto(id, dataUrl, removeBackground, kind)  cut the garment out
@@ -35,9 +35,16 @@ import {buildGarment, PANTS, SHIRT} from './garmentGeometry.js';
 // The app can match its own screen colour by setting window.__BACKGROUND first.
 const BACKGROUND = window.__BACKGROUND || '#ece7df';
 const FOV = 30;
-const SPIN_SPEED = 0.6; // radians per second
-const DRAG_SPEED = 0.012; // radians per pixel
-const SNAPSHOT = {width: 480, height: 600, yaw: 0.3};
+// The garment is only seen from the front; it tilts a little to look 3D.
+const TILT = {
+  yaw: 0.26, // furthest turn sideways (about 15 degrees)
+  pitch: 0.14, // furthest tilt up or down (about 8 degrees)
+  drag: 0.004, // radians per pixel dragged
+  sway: 0.12, // gentle sway while untouched
+  swaySeconds: 6, // one sway, left and back
+  settle: 6, // how quickly it eases back after a drag
+};
+const SNAPSHOT = {width: 480, height: 600, yaw: 0.16};
 const ALIGN_COLOR = '#9fb0c4'; // model colour while aligning the photo
 const ANALYSIS_SIZE = 400; // px, longest side used to find the garment
 const CUTOUT_SIZE = 800; // px, longest side of the stored cut-out
@@ -111,10 +118,12 @@ const state = {
   outfit: false,
   mode: 'fit',
   color: '#f2f0eb',
-  autoRotate: true,
+  sway: true,
   view: '3d',
   align: {...DEFAULT_ALIGN},
   yaw: 0,
+  pitch: 0,
+  swayTime: 0,
   dragging: false,
   // Guards against a slow load finishing after a newer request.
   request: 0,
@@ -198,61 +207,75 @@ function loadTexture(dataUrl) {
   );
 }
 
+// Light for the 2.5D shading, in view space: from the upper left, in front.
+const SHADE_LIGHT = new THREE.Vector3(-0.35, 0.5, 0.8).normalize();
+
 /**
- * Fabric material that shows the photo over the model's front. The photo is
- * projected straight through the model along z, so UVs are computed in the
- * shader; it fades out on surfaces that face sideways or away so it does not
- * smear over the sleeves' sides and the back.
+ * Fabric material that shows the photo over the model's front, as a "2.5D"
+ * picture: the photo is projected straight through the model along z (UVs are
+ * computed in the shader) and covers the whole front silhouette, edge to edge.
+ * It keeps the photo's own colours where the model faces the viewer and only
+ * adds soft shading from the model's shape (darker where the surface turns
+ * away), so the garment looks rounded without changing what the photo shows.
+ * The garment is only ever seen from the front (it tilts a little), so the
+ * fabric colour only fills gaps the photo doesn't cover.
  */
 function makeFitMaterial(color, texture, bbox) {
-  const material = new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.85,
-    side: THREE.DoubleSide,
-  });
   const uniforms = {
     uPhoto: {value: texture},
     uAlign: {value: new THREE.Vector4(1, 1, 0, 0)},
     uBox: {value: new THREE.Vector4(bbox.cx, bbox.cy, bbox.W, bbox.H)},
     uMix: {value: 1},
+    uColor: {value: new THREE.Color(color)},
+    uLight: {value: SHADE_LIGHT},
   };
-  material.onBeforeCompile = shader => {
-    Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        '#include <common>\nvarying vec3 vObjPos;\nvarying vec3 vObjNormal;',
-      )
-      .replace(
-        '#include <begin_vertex>',
-        '#include <begin_vertex>\nvObjPos = position;\nvObjNormal = normal;',
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        `#include <common>
-        uniform sampler2D uPhoto;
-        uniform vec4 uAlign;
-        uniform vec4 uBox;
-        uniform float uMix;
-        varying vec3 vObjPos;
-        varying vec3 vObjNormal;`,
-      )
-      .replace(
-        '#include <color_fragment>',
-        `#include <color_fragment>
+  const material = new THREE.ShaderMaterial({
+    uniforms,
+    side: THREE.DoubleSide,
+    vertexShader: `
+      varying vec3 vObjPos;
+      varying vec3 vNormal;
+      void main() {
+        vObjPos = position;
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform sampler2D uPhoto;
+      uniform vec4 uAlign;
+      uniform vec4 uBox;
+      uniform float uMix;
+      uniform vec3 uColor;
+      uniform vec3 uLight;
+      varying vec3 vObjPos;
+      varying vec3 vNormal;
+      void main() {
         vec2 puv = vec2(
           (vObjPos.x - uBox.x - uAlign.z * uBox.z) / (uAlign.x * uBox.z) + 0.5,
           (vObjPos.y - uBox.y - uAlign.w * uBox.w) / (uAlign.y * uBox.w) + 0.5
         );
         vec4 photo = texture2D(uPhoto, puv);
         float inside = step(0.0, puv.x) * step(puv.x, 1.0) * step(0.0, puv.y) * step(puv.y, 1.0);
-        float facing = smoothstep(0.3, 0.75, vObjNormal.z) * (gl_FrontFacing ? 1.0 : 0.0);
-        diffuseColor.rgb = mix(diffuseColor.rgb, photo.rgb, photo.a * inside * facing * uMix);`,
-      );
-  };
-  material.customProgramCacheKey = () => 'wardrobe-fit';
+        vec3 base = mix(uColor, photo.rgb, photo.a * inside * uMix);
+        vec3 n = normalize(vNormal) * (gl_FrontFacing ? 1.0 : -1.0);
+        // 1.0 where the surface faces the viewer (the photo's own colours),
+        // a little brighter towards the light, darker where it turns away.
+        float shade = 0.6 + 0.5 * max(dot(n, uLight), 0.0);
+        shade *= mix(0.78, 1.0, smoothstep(0.0, 0.45, n.z));
+        gl_FragColor = vec4(base * shade, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  });
   return {material, uniforms};
+}
+
+/** Sets a garment's fabric colour. */
+function setFabric(g, hex) {
+  if (g.uniforms) {
+    g.uniforms.uColor.value.set(hex);
+  } else {
+    g.material.color.set(hex);
+  }
 }
 
 function disposeOf(g) {
@@ -577,7 +600,7 @@ function applyView() {
   if (garment.uniforms) {
     garment.uniforms.uMix.value = aligning ? 0 : 1;
   }
-  garment.material.color.set(aligning ? ALIGN_COLOR : state.color);
+  setFabric(garment, aligning ? ALIGN_COLOR : state.color);
   alignPlane.visible = aligning;
   if (aligning) {
     alignPlane.material.map = garment.texture;
@@ -694,10 +717,21 @@ function frame(now) {
   const delta = Math.min((now - last) / 1000, 0.1);
   last = now;
   const aligning = state.view === 'align' && garment && garment.uniforms;
-  if (!aligning && !state.outfit && state.autoRotate && !state.dragging) {
-    state.yaw += delta * SPIN_SPEED;
+  if (!state.dragging) {
+    // Ease back from a drag into the gentle sway (or to rest).
+    let target = 0;
+    if (state.sway) {
+      state.swayTime += delta;
+      target =
+        TILT.sway * Math.sin((state.swayTime / TILT.swaySeconds) * Math.PI * 2);
+    }
+    const k = 1 - Math.exp(-delta * TILT.settle);
+    state.yaw += (target - state.yaw) * k;
+    state.pitch -= state.pitch * k;
   }
-  spinner.rotation.y = aligning || state.outfit ? 0 : state.yaw;
+  const still = aligning || state.outfit;
+  spinner.rotation.y = still ? 0 : state.yaw;
+  spinner.rotation.x = still ? 0 : state.pitch;
   stepTransitions(now);
   if (state.outfit) {
     const k = 1 - Math.exp(-delta * 9);
@@ -711,7 +745,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // ---------------------------------------------------------------------------
-// Touch: drag to spin 360° (3D) or move / pinch the photo (alignment)
+// Touch: drag to tilt (3D) or move / pinch the photo (alignment)
 // ---------------------------------------------------------------------------
 
 const pointers = new Map();
@@ -750,7 +784,8 @@ canvas.addEventListener('pointermove', e => {
       moveAlign(dx, dy);
     }
   } else if (pointers.size === 1) {
-    state.yaw += dx * DRAG_SPEED;
+    state.yaw = clamp(state.yaw + dx * TILT.drag, -TILT.yaw, TILT.yaw);
+    state.pitch = clamp(state.pitch + dy * TILT.drag, -TILT.pitch, TILT.pitch);
   }
 });
 const endDrag = e => {
@@ -1654,15 +1689,15 @@ function snapshot(id) {
       applyView();
       post({type: 'view', view: '3d'});
     }
-    const previousYaw = spinner.rotation.y;
+    const previous = spinner.rotation.clone();
     renderer.setPixelRatio(1);
     renderer.setSize(SNAPSHOT.width, SNAPSHOT.height, false);
     camera.aspect = SNAPSHOT.width / SNAPSHOT.height;
     fitCamera();
-    spinner.rotation.y = SNAPSHOT.yaw;
+    spinner.rotation.set(0, SNAPSHOT.yaw, 0);
     renderer.render(scene, camera);
     const data = canvas.toDataURL('image/jpeg', 0.9);
-    spinner.rotation.y = previousYaw;
+    spinner.rotation.copy(previous);
     resize();
     post({type: 'snapshot', id, data});
   } catch (e) {
@@ -1676,8 +1711,8 @@ window.__setOutfit = setOutfit;
 window.__dragOutfit = dragOutfit;
 window.__releaseOutfit = releaseOutfit;
 window.__setColor = setColor;
-window.__setAutoRotate = value => {
-  state.autoRotate = value;
+window.__setSway = value => {
+  state.sway = value;
 };
 window.__setView = view => {
   state.view = view === 'align' && garment && garment.uniforms ? 'align' : '3d';

@@ -96,7 +96,7 @@ export function GarmentViewerModal({garment, onClose, onDelete, onUse}: Props) {
           />
         ) : null}
         <Text style={[styles.hint, {paddingBottom: insets.bottom + 16}]}>
-          Drag to spin 360°
+          Drag to tilt
         </Text>
       </View>
     </Modal>
