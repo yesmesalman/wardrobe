@@ -1,5 +1,8 @@
 export type GarmentKind = 'shirt' | 'pants';
 
+/** The avatar's body type, which the blank 3D models are cut for. */
+export type BodyType = 'man' | 'woman';
+
 /** Which blank 3D model a garment uses. */
 export type ShirtVariant = 'short-sleeve' | 'long-sleeve';
 export type PantsVariant = 'long-pants' | 'shorts';

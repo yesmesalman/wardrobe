@@ -9,7 +9,13 @@ import React, {
 import {ActivityIndicator, StyleSheet, View, ViewStyle} from 'react-native';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
 import {DEFAULT_ALIGN, theme} from '../constants';
-import type {Align, GarmentKind, PhotoMode, Variant} from '../types';
+import type {
+  Align,
+  BodyType,
+  GarmentKind,
+  PhotoMode,
+  Variant,
+} from '../types';
 import {SCENE_HTML} from '../webview/sceneHtml';
 
 export interface Photo {
@@ -38,14 +44,16 @@ export interface GarmentViewHandle {
   snapshot: () => Promise<string>;
   /**
    * Cuts the garment out of a photo (base64 JPEG) for "fit" mode and warps it
-   * onto each of the kind's standard models. `aiMask` is the AI model's mask
-   * (see src/ai/garmentMask.ts); without it the background is flood-filled.
+   * onto each of the kind's standard models for the body type. `aiMask` is
+   * the AI model's mask (see src/ai/garmentMask.ts); without it the
+   * background is flood-filled.
    */
   processPhoto: (
     photoBase64: string,
     removeBackground: boolean,
     kind: GarmentKind,
-    aiMask?: string | null,
+    aiMask: string | null | undefined,
+    body: BodyType,
   ) => Promise<Cutout>;
   /** Puts the photo back to the automatic fit. */
   resetAlign: () => void;
@@ -55,6 +63,8 @@ export interface GarmentViewHandle {
 
 interface Props {
   variant: Variant;
+  /** The body type the model is cut for. */
+  body: BodyType;
   color: string;
   /** Fit mode: the cut-out (PNG). Print mode: the photo (JPEG). */
   photo?: Photo | null;
@@ -91,6 +101,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
   function GarmentViewImpl(
     {
       variant,
+      body,
       color,
       photo,
       mode = 'print',
@@ -125,13 +136,14 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
         run(
           `window.__setGarment(${JSON.stringify({
             variant,
+            body,
             photo: photoUri,
             mode,
             align: initialAlign.current,
           })})`,
         );
       }
-    }, [ready, variant, photoUri, mode, run]);
+    }, [ready, variant, body, photoUri, mode, run]);
 
     useEffect(() => {
       if (ready) {
@@ -185,7 +197,13 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
             'Timed out capturing the 3D preview.',
             id => run(`window.__snapshot(${JSON.stringify(id)})`),
           ),
-        processPhoto: async (photoBase64, removeBackground, kind, aiMask) => {
+        processPhoto: async (
+          photoBase64,
+          removeBackground,
+          kind,
+          aiMask,
+          forBody,
+        ) => {
           // The page may still be starting up.
           await new Promise<void>(resolve => {
             if (ready) {
@@ -203,7 +221,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
                   `data:image/jpeg;base64,${photoBase64}`,
                 )}, ${removeBackground}, ${JSON.stringify(kind)}, ${JSON.stringify(
                   aiMask ?? null,
-                )})`,
+                )}, ${JSON.stringify(forBody)})`,
               ),
           );
         },

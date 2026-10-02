@@ -20,12 +20,14 @@ import {
 import {frontOutline} from '../../webview/garmentGeometry';
 import {MAX_PHOTO_SIZE} from '../hooks/pickPhoto';
 import {takeTempFileBase64} from '../storage/wardrobeStorage';
-import type {GarmentKind} from '../types';
+import type {BodyType, GarmentKind} from '../types';
 import {CloseIcon} from './icons';
 
 interface Props {
   /** The kind being photographed; the camera is open while set. */
   kind: GarmentKind | null;
+  /** The body type whose model the outline shows. */
+  body: BodyType;
   /** The photo, as base64 JPEG no larger than the stored photos. */
   onCapture: (photoBase64: string) => void;
   /** Pick a photo from the library instead. */
@@ -55,7 +57,13 @@ const errorMessage = (e: unknown) =>
  * the garment is photographed in the model's shape: laid flat, sleeves or legs
  * at the model's angle. The closer the photo matches, the better the fit.
  */
-export function GuidedCamera({kind, onCapture, onLibrary, onCancel}: Props) {
+export function GuidedCamera({
+  kind,
+  body,
+  onCapture,
+  onLibrary,
+  onCancel,
+}: Props) {
   const insets = useSafeAreaInsets();
   const visible = kind !== null;
   // While the screen slides away (kind already null), keep showing its kind.
@@ -162,7 +170,7 @@ export function GuidedCamera({kind, onCapture, onLibrary, onCancel}: Props) {
           <Text style={styles.tip}>{tips.tip}</Text>
 
           <View style={styles.guide} pointerEvents="none">
-            {message ? null : <GuideOutline kind={shownKind} />}
+            {message ? null : <GuideOutline kind={shownKind} body={body} />}
           </View>
           {message ? (
             <View style={styles.message} pointerEvents="box-none">
@@ -229,9 +237,9 @@ async function takePhoto(
 }
 
 /** Faint outline of the blank model, with dashes where shorter ones end. */
-function GuideOutline({kind}: {kind: GarmentKind}) {
+function GuideOutline({kind, body}: {kind: GarmentKind; body: BodyType}) {
   const {path, cuffs, viewBox, unit} = useMemo(() => {
-    const {outline, cuffs: ends} = frontOutline(kind);
+    const {outline, cuffs: ends} = frontOutline(kind, body);
     // SVG's y runs down; the model's runs up.
     const xs = outline.map(([x]) => x);
     const ys = outline.map(([, y]) => -y);
@@ -246,7 +254,7 @@ function GuideOutline({kind}: {kind: GarmentKind}) {
       viewBox: `${minX - pad} ${minY - pad} ${w + 2 * pad} ${h + 2 * pad}`,
       unit: Math.max(w, h) / 300,
     };
-  }, [kind]);
+  }, [kind, body]);
   return (
     <Svg width="100%" height="100%" viewBox={viewBox}>
       <Path

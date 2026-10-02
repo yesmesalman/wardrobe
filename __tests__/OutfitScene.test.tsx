@@ -85,3 +85,22 @@ test('tells the page which way a new garment slides in from', async () => {
   await render(garment('a', 'shirt'), -1);
   expect(lastOutfit().shirt).toMatchObject({id: 'a', slide: -1});
 });
+
+test('cuts the figure for the body type', async () => {
+  mockInject.mockClear();
+  await ReactTestRenderer.act(async () => {
+    ReactTestRenderer.create(
+      <OutfitScene
+        shirt={garment('w', 'shirt')}
+        pants={garment('p', 'pants')}
+        body="woman"
+      />,
+    );
+  });
+  await ReactTestRenderer.act(async () => {
+    mockOnMessage?.({nativeEvent: {data: JSON.stringify({type: 'ready'})}});
+  });
+  await flush();
+  expect(lastOutfit().shirt).toMatchObject({id: 'w', body: 'woman'});
+  expect(lastOutfit().pants).toMatchObject({id: 'p', body: 'woman'});
+});

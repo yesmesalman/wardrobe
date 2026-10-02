@@ -3,6 +3,7 @@ import React, {
   ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -12,11 +13,12 @@ import {AddPantsModal} from '../components/AddPantsModal';
 import {AddShirtModal} from '../components/AddShirtModal';
 import type {GarmentDraft} from '../components/AddGarmentModal';
 import {GuidedCamera} from '../components/GuidedCamera';
-import {KIND_LABELS, MAX_PER_KIND} from '../constants';
+import {DEFAULT_BODY_TYPE, KIND_LABELS, MAX_PER_KIND} from '../constants';
 import {pickPhoto} from '../hooks/pickPhoto';
 import {navigationRef} from '../navigationRef';
 import {useWardrobe} from '../hooks/useWardrobe';
-import type {Garment, GarmentKind} from '../types';
+import {loadSettings, saveSettings} from '../storage/settingsStorage';
+import type {BodyType, Garment, GarmentKind} from '../types';
 
 type Wardrobe = ReturnType<typeof useWardrobe>;
 
@@ -36,6 +38,11 @@ interface WardrobeContextValue {
   /** The garment `wear` asked for, until the Outfit screen has put it on. */
   wearRequest: Garment | null;
   clearWearRequest: () => void;
+  /** The avatar's body type (Avatar Settings), which the models are cut for. */
+  bodyType: BodyType;
+  setBodyType: (body: BodyType) => void;
+  /** The saved wardrobe and settings have both loaded. */
+  loaded: boolean;
 }
 
 const WardrobeContext = createContext<WardrobeContextValue | null>(null);
@@ -57,6 +64,8 @@ const errorMessage = (e: unknown) =>
  */
 export function WardrobeProvider({children}: {children: ReactNode}) {
   const wardrobe = useWardrobe();
+  const [bodyType, setBody] = useState<BodyType>(DEFAULT_BODY_TYPE);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [libraryTab, setLibraryTab] = useState<GarmentKind>('shirt');
   const [wearRequest, setWearRequest] = useState<Garment | null>(null);
   const [chooserOpen, setChooserOpen] = useState(false);
@@ -64,6 +73,21 @@ export function WardrobeProvider({children}: {children: ReactNode}) {
   const [draft, setDraft] = useState<{kind: GarmentKind; photo: string} | null>(
     null,
   );
+
+  useEffect(() => {
+    loadSettings()
+      .then(settings => setBody(settings.bodyType))
+      .finally(() => setSettingsLoaded(true));
+  }, []);
+
+  const setBodyType = useCallback((body: BodyType) => {
+    setBody(body);
+    saveSettings({bodyType: body}).catch(e =>
+      console.warn('Could not save the settings', e),
+    );
+  }, []);
+
+  const loaded = wardrobe.loaded && settingsLoaded;
 
   const pickFromLibrary = useCallback(async (kind: GarmentKind) => {
     try {
@@ -152,13 +176,26 @@ export function WardrobeProvider({children}: {children: ReactNode}) {
       wear,
       wearRequest,
       clearWearRequest,
+      bodyType,
+      setBodyType,
+      loaded,
     }),
     // startAdd only reads the latest wardrobe, which is already a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wardrobe, libraryTab, wear, wearRequest, clearWearRequest],
+    [
+      wardrobe,
+      libraryTab,
+      wear,
+      wearRequest,
+      clearWearRequest,
+      bodyType,
+      setBodyType,
+      loaded,
+    ],
   );
 
   const modalProps = (kind: GarmentKind) => ({
+    body: bodyType,
     photoBase64: draft?.kind === kind ? draft.photo : null,
     full: wardrobe.isFull(kind),
     onSave: save,
@@ -177,6 +214,7 @@ export function WardrobeProvider({children}: {children: ReactNode}) {
       />
       <GuidedCamera
         kind={cameraKind}
+        body={bodyType}
         onCapture={captured}
         onLibrary={libraryInstead}
         onCancel={() => setCameraKind(null)}

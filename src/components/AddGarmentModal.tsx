@@ -19,7 +19,7 @@ import {
   theme,
   VARIANTS,
 } from '../constants';
-import type {Align, GarmentKind, Variant} from '../types';
+import type {Align, BodyType, GarmentKind, Variant} from '../types';
 import {garmentMask, prepareGarmentMask} from '../ai/garmentMask';
 import {Cutout, GarmentView, GarmentViewHandle, Photo} from './GarmentView';
 import {SegmentedControl} from './SegmentedControl';
@@ -36,6 +36,8 @@ export interface GarmentDraft {
 }
 
 export interface AddGarmentProps {
+  /** The body type the models are cut for (Avatar Settings). */
+  body: BodyType;
   /** Base64 JPEG of the freshly picked photo; the screen is open while set. */
   photoBase64: string | null;
   /** True when the library already holds the maximum of this kind. */
@@ -63,6 +65,7 @@ const errorMessage = (e: unknown) =>
 export function AddGarmentModal({
   kind,
   title,
+  body,
   photoBase64,
   full,
   onSave,
@@ -113,7 +116,13 @@ export function AddGarmentModal({
       .then(aiMask =>
         cancelled || !view.current
           ? null
-          : view.current.processPhoto(photoBase64, removeBackground, kind, aiMask),
+          : view.current.processPhoto(
+              photoBase64,
+              removeBackground,
+              kind,
+              aiMask,
+              body,
+            ),
       )
       .then(result => {
         if (cancelled || !result) {
@@ -138,7 +147,7 @@ export function AddGarmentModal({
     return () => {
       cancelled = true;
     };
-  }, [photoBase64, removeBackground, kind]);
+  }, [photoBase64, removeBackground, kind, body]);
 
   // The cut-out warped onto the chosen variant's model.
   const image = cutout?.images[variant] ?? null;
@@ -196,6 +205,7 @@ export function AddGarmentModal({
           <GarmentView
             ref={view}
             variant={variant}
+            body={body}
             color={color}
             photo={shownPhoto}
             mode="fit"

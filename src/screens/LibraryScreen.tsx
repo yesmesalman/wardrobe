@@ -35,6 +35,7 @@ export function LibraryScreen() {
     libraryTab: tab,
     setLibraryTab: setTab,
     wear,
+    bodyType,
   } = useWardrobeContext();
   const [viewing, setViewing] = useState<Garment | null>(null);
   // After Select is tapped, taps pick items instead of opening them.
@@ -184,6 +185,7 @@ export function LibraryScreen() {
 
       <GarmentViewerModal
         garment={viewing}
+        body={bodyType}
         onClose={() => setViewing(null)}
         onDelete={remove}
         onUse={garment => {

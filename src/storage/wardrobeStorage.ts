@@ -29,9 +29,11 @@ export async function loadGarments(): Promise<Garment[]> {
     if (!Array.isArray(parsed)) {
       return [];
     }
-    // Older garments: print mode came first, then variants were added.
-    return parsed.map(g => ({
+    // Older garments: print mode came first, then variants were added. A
+    // few test builds kept one cut-out per body type (`fits`).
+    return parsed.map(({fits, ...g}) => ({
       ...g,
+      ...(fits ? Object.values(fits)[0] ?? null : null),
       variant: g.variant ?? (g.kind === 'pants' ? 'long-pants' : 'short-sleeve'),
       mode: g.mode ?? 'print',
       align: g.align ?? DEFAULT_ALIGN,

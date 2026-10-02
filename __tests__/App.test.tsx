@@ -3,11 +3,13 @@
  */
 
 import React from 'react';
-import {Text} from 'react-native';
+import {Alert, Text} from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
 import {SettingsScreen} from '../src/screens/SettingsScreen';
 import {WardrobeProvider} from '../src/state/WardrobeContext';
+import * as settingsStorage from '../src/storage/settingsStorage';
+import * as wardrobeStorage from '../src/storage/wardrobeStorage';
 
 jest.mock('react-native-safe-area-context', () =>
   require('react-native-safe-area-context/jest/mock').default,
@@ -24,6 +26,10 @@ jest.mock('../src/storage/wardrobeStorage', () => ({
   deleteGarmentFiles: jest.fn(),
   deleteAllData: jest.fn(() => Promise.resolve()),
   fileUri: jest.fn((name: string) => `file:///garments/${name}`),
+}));
+jest.mock('../src/storage/settingsStorage', () => ({
+  loadSettings: jest.fn(() => Promise.resolve({bodyType: 'man'})),
+  saveSettings: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('../src/hooks/pickPhoto', () => ({pickPhoto: jest.fn()}));
 // The background-removal model runs natively.
@@ -98,7 +104,7 @@ test('has Library, Outfit, Trending and Settings tabs, with a centre Add item bu
   jest.useRealTimers();
 });
 
-test('Settings has Reset Data and no Add item button', async () => {
+test('Settings has Avatar Settings, Reset Data and no Add item button', async () => {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
     renderer = ReactTestRenderer.create(
@@ -109,6 +115,58 @@ test('Settings has Reset Data and no Add item button', async () => {
   });
   const text = screenText(renderer);
   expect(text).toContain('Settings');
+  expect(text).toContain('Avatar Settings');
   expect(text).toContain('Reset Data');
   expect(text).not.toContain('Add item');
+});
+
+test('Avatar Settings changes the body type, Man by default, after confirming it removes all data', async () => {
+  const alert = jest.spyOn(Alert, 'alert');
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(
+      <WardrobeProvider>
+        <SettingsScreen />
+      </WardrobeProvider>,
+    );
+  });
+  const pressable = (label: string, extra = {}) =>
+    renderer.root.find(
+      node =>
+        typeof node.props.onPress === 'function' &&
+        node.findAllByType(Text).some(t => t.props.children === label) &&
+        Object.entries(extra).every(([k, v]) => node.props[k] === v),
+    );
+  await ReactTestRenderer.act(async () => {
+    pressable('Avatar Settings').props.onPress();
+  });
+  expect(screenText(renderer)).toContain('Body Type');
+  const segment = (label: string) =>
+    pressable(label, {accessibilityRole: 'button'}).props.accessibilityState
+      .selected;
+  expect(segment('Man')).toBe(true);
+  expect(segment('Woman')).toBe(false);
+
+  // Asks first; cancelling keeps everything.
+  await ReactTestRenderer.act(async () => {
+    pressable('Woman', {accessibilityRole: 'button'}).props.onPress();
+  });
+  expect(alert).toHaveBeenCalledTimes(1);
+  expect(alert.mock.calls[0][1]).toContain('remove all your data');
+  const buttons = alert.mock.calls[0][2]!;
+  await ReactTestRenderer.act(async () => {
+    buttons.find(b => b.style === 'cancel')?.onPress?.();
+  });
+  expect(segment('Man')).toBe(true);
+  expect(wardrobeStorage.deleteAllData).not.toHaveBeenCalled();
+  expect(settingsStorage.saveSettings).not.toHaveBeenCalled();
+
+  // Confirming removes all data, then changes the body type.
+  await ReactTestRenderer.act(async () => {
+    await buttons.find(b => b.style === 'destructive')?.onPress?.();
+  });
+  expect(wardrobeStorage.deleteAllData).toHaveBeenCalled();
+  expect(segment('Woman')).toBe(true);
+  expect(settingsStorage.saveSettings).toHaveBeenCalledWith({bodyType: 'woman'});
+  alert.mockRestore();
 });

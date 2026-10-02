@@ -3,18 +3,26 @@ import {Alert, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {theme, VARIANT_LABELS} from '../constants';
 import {readFileBase64} from '../storage/wardrobeStorage';
-import type {Garment} from '../types';
+import type {BodyType, Garment} from '../types';
 import {GarmentView, Photo} from './GarmentView';
 
 interface Props {
   garment: Garment | null;
+  /** The body type to show it on. */
+  body: BodyType;
   onClose: () => void;
   onDelete: (garment: Garment) => void;
   /** Wear this garment in the Outfit view. */
   onUse: (garment: Garment) => void;
 }
 
-export function GarmentViewerModal({garment, onClose, onDelete, onUse}: Props) {
+export function GarmentViewerModal({
+  garment,
+  body,
+  onClose,
+  onDelete,
+  onUse,
+}: Props) {
   const insets = useSafeAreaInsets();
   const [photo, setPhoto] = useState<Photo | null>(null);
 
@@ -88,6 +96,7 @@ export function GarmentViewerModal({garment, onClose, onDelete, onUse}: Props) {
           <GarmentView
             key={garment.id}
             variant={garment.variant}
+            body={body}
             color={garment.color}
             photo={photo}
             mode={garment.mode}

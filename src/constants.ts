@@ -1,4 +1,4 @@
-import type {Align, GarmentKind, Variant} from './types';
+import type {Align, BodyType, GarmentKind, Variant} from './types';
 
 /** How many shirts and how many pants the wardrobe holds. */
 export const MAX_PER_KIND = 20;
@@ -45,6 +45,13 @@ export const VARIANT_LABELS: Record<Variant, string> = {
   'long-pants': 'Long pants',
   shorts: 'Shorts',
 };
+
+export const DEFAULT_BODY_TYPE: BodyType = 'man';
+
+export const BODY_TYPES: {value: BodyType; label: string}[] = [
+  {value: 'man', label: 'Man'},
+  {value: 'woman', label: 'Woman'},
+];
 
 export const DEFAULT_COLOR: Record<GarmentKind, string> = {
   shirt: '#F2F0EB',

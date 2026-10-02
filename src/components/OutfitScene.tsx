@@ -10,7 +10,7 @@ import {ActivityIndicator, StyleSheet, View, ViewStyle} from 'react-native';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
 import {theme} from '../constants';
 import {readFileBase64} from '../storage/wardrobeStorage';
-import type {Garment, GarmentKind} from '../types';
+import type {BodyType, Garment, GarmentKind} from '../types';
 import {SCENE_HTML} from '../webview/sceneHtml';
 
 /** Where the waist and the middle of each garment fall, as fractions of the view's height. */
@@ -35,6 +35,8 @@ interface Props {
   ref?: Ref<OutfitSceneHandle>;
   shirt: Garment | null;
   pants: Garment | null;
+  /** The body type the figure is cut for (the man's by default). */
+  body?: BodyType;
   /**
    * Which side a newly chosen garment slides in from: 1 from the right (the
    * next item), -1 from the left (the previous one), 0 for no slide.
@@ -66,12 +68,14 @@ async function loadPhoto(garment: Garment): Promise<Loaded> {
 const spec = (
   garment: Garment | null,
   loaded: Loaded | null,
+  body: BodyType,
   slide: number,
 ) =>
   garment && loaded && loaded.id === garment.id
     ? {
         id: garment.id,
         slide,
+        body,
         variant: garment.variant,
         photo: loaded.photo,
         mode: garment.mode,
@@ -88,6 +92,7 @@ export function OutfitScene({
   ref,
   shirt,
   pants,
+  body = 'man',
   shirtSlide = 0,
   pantsSlide = 0,
   style,
@@ -167,8 +172,8 @@ export function OutfitScene({
     };
   }, [pants]);
 
-  const shirtSpec = spec(shirt, shirtImage, shirtSlide);
-  const pantsSpec = spec(pants, pantsImage, pantsSlide);
+  const shirtSpec = spec(shirt, shirtImage, body, shirtSlide);
+  const pantsSpec = spec(pants, pantsImage, body, pantsSlide);
   // Wait for images so a garment never flashes as a plain colour.
   const waiting = (shirt && !shirtSpec) || (pants && !pantsSpec);
 
@@ -183,7 +188,7 @@ export function OutfitScene({
     }
     // The specs are rebuilt every render; the garments and images are the inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, waiting, shirt?.id, pants?.id, shirtImage?.id, pantsImage?.id]);
+  }, [ready, waiting, shirt?.id, pants?.id, shirtImage?.id, pantsImage?.id, body]);
 
   const onMessage = useCallback(
     (event: WebViewMessageEvent) => {

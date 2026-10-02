@@ -31,6 +31,7 @@ export function OutfitScreen() {
     startAdd,
     wearRequest,
     clearWearRequest,
+    bodyType,
   } = useWardrobeContext();
   const [shirtIndex, setShirtIndex] = useState(0);
   const [pantsIndex, setPantsIndex] = useState(0);
@@ -102,6 +103,7 @@ export function OutfitScreen() {
           ref={scene}
           shirt={shirt}
           pants={trousers}
+          body={bodyType}
           shirtSlide={shirtSlide}
           pantsSlide={pantsSlide}
           onSplitChange={setLayout}

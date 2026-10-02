@@ -13,10 +13,10 @@ const FADE_OUT = 450;
 /**
  * Takes over from the plain white native launch screen: the hanger fades in
  * (growing slightly into place), holds, then fades out once the saved
- * wardrobe has loaded, and the white fades after it to reveal the app.
+ * wardrobe and settings have loaded, and the white fades after it to reveal the app.
  */
 export function SplashScreen() {
-  const {wardrobe} = useWardrobeContext();
+  const {loaded} = useWardrobeContext();
   // 0 = hidden, 1 = shown, 2 = gone.
   const [logo] = useState(() => new Animated.Value(0));
   const [backdrop] = useState(() => new Animated.Value(1));
@@ -41,7 +41,7 @@ export function SplashScreen() {
   });
 
   useEffect(() => {
-    if (!shown || !wardrobe.loaded || leaving.current) {
+    if (!shown || !loaded || leaving.current) {
       return;
     }
     leaving.current = true;
@@ -60,7 +60,7 @@ export function SplashScreen() {
         useNativeDriver: true,
       }),
     ]).start(() => setDone(true));
-  }, [shown, wardrobe.loaded, logo, backdrop]);
+  }, [shown, loaded, logo, backdrop]);
 
   if (done) {
     return null;
