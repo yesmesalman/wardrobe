@@ -26,6 +26,11 @@ jest.mock('../src/storage/wardrobeStorage', () => ({
   fileUri: jest.fn((name: string) => `file:///garments/${name}`),
 }));
 jest.mock('../src/hooks/pickPhoto', () => ({pickPhoto: jest.fn()}));
+// The background-removal model runs natively.
+jest.mock('../src/ai/garmentMask', () => ({
+  garmentMask: jest.fn(() => Promise.resolve(null)),
+  prepareGarmentMask: jest.fn(),
+}));
 
 // A cold Babel cache transpiles the whole app tree, which can exceed 5 seconds.
 jest.setTimeout(60000);

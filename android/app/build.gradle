@@ -85,6 +85,12 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    // The background-removal model (src/assets/ai/u2netp.onnx) ships as an app asset.
+    sourceSets {
+        main {
+            assets.srcDirs += ["../../src/assets/ai"]
+        }
+    }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')

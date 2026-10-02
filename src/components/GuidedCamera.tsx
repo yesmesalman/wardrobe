@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -58,6 +58,12 @@ const errorMessage = (e: unknown) =>
 export function GuidedCamera({kind, onCapture, onLibrary, onCancel}: Props) {
   const insets = useSafeAreaInsets();
   const visible = kind !== null;
+  // While the screen slides away (kind already null), keep showing its kind.
+  const lastKind = useRef<GarmentKind>('shirt');
+  if (kind) {
+    lastKind.current = kind;
+  }
+  const shownKind = kind ?? lastKind.current;
   const device = useCameraDevice('back');
   const {hasPermission, canRequestPermission, requestPermission} =
     useCameraPermission();
@@ -71,8 +77,8 @@ export function GuidedCamera({kind, onCapture, onLibrary, onCancel}: Props) {
     }
   }, [visible, canRequestPermission, requestPermission]);
 
+  // Kept while the screen closes, so the guide doesn't flash back in.
   useEffect(() => {
-    setNoCamera(false);
     if (!visible || device) {
       return;
     }
@@ -94,7 +100,7 @@ export function GuidedCamera({kind, onCapture, onLibrary, onCancel}: Props) {
     }
   };
 
-  const tips = TIPS[kind ?? 'shirt'];
+  const tips = TIPS[shownKind];
   const ready = hasPermission && !!device;
   let message: React.ReactNode = null;
   if (!hasPermission && !canRequestPermission) {
@@ -156,7 +162,7 @@ export function GuidedCamera({kind, onCapture, onLibrary, onCancel}: Props) {
           <Text style={styles.tip}>{tips.tip}</Text>
 
           <View style={styles.guide} pointerEvents="none">
-            {message ? null : <GuideOutline kind={kind ?? 'shirt'} />}
+            {message ? null : <GuideOutline kind={shownKind} />}
           </View>
           {message ? (
             <View style={styles.message} pointerEvents="box-none">

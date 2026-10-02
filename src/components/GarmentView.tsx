@@ -29,6 +29,8 @@ export interface Cutout {
   removed: boolean;
   /** The variant the garment looks like (e.g. long sleeves), if measured. */
   variant: Variant | null;
+  /** How the garment was found: the AI model's mask or the flood-fill. */
+  method: 'ai' | 'flood' | null;
 }
 
 export interface GarmentViewHandle {
@@ -36,12 +38,14 @@ export interface GarmentViewHandle {
   snapshot: () => Promise<string>;
   /**
    * Cuts the garment out of a photo (base64 JPEG) for "fit" mode and warps it
-   * onto each of the kind's standard models.
+   * onto each of the kind's standard models. `aiMask` is the AI model's mask
+   * (see src/ai/garmentMask.ts); without it the background is flood-filled.
    */
   processPhoto: (
     photoBase64: string,
     removeBackground: boolean,
     kind: GarmentKind,
+    aiMask?: string | null,
   ) => Promise<Cutout>;
   /** Puts the photo back to the automatic fit. */
   resetAlign: () => void;
@@ -60,6 +64,8 @@ interface Props {
   view?: '3d' | 'align';
   /** Sway gently while untouched (dragging always tilts it a little). */
   sway?: boolean;
+  /** Show a spinner until the garment is drawn (off when the screen shows its own). */
+  spinner?: boolean;
   style?: ViewStyle;
   onAlignChange?: (align: Align) => void;
   /** The page switched view by itself (e.g. before taking a snapshot). */
@@ -91,6 +97,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
       align = DEFAULT_ALIGN,
       view = '3d',
       sway = true,
+      spinner = true,
       style,
       onAlignChange,
       onViewChange,
@@ -178,7 +185,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
             'Timed out capturing the 3D preview.',
             id => run(`window.__snapshot(${JSON.stringify(id)})`),
           ),
-        processPhoto: async (photoBase64, removeBackground, kind) => {
+        processPhoto: async (photoBase64, removeBackground, kind, aiMask) => {
           // The page may still be starting up.
           await new Promise<void>(resolve => {
             if (ready) {
@@ -194,7 +201,9 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
               run(
                 `window.__processPhoto(${JSON.stringify(id)}, ${JSON.stringify(
                   `data:image/jpeg;base64,${photoBase64}`,
-                )}, ${removeBackground}, ${JSON.stringify(kind)})`,
+                )}, ${removeBackground}, ${JSON.stringify(kind)}, ${JSON.stringify(
+                  aiMask ?? null,
+                )})`,
               ),
           );
         },
@@ -243,6 +252,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
               color: message.color,
               removed: message.removed,
               variant: message.variant ?? null,
+              method: message.method ?? null,
             } satisfies Cutout);
             break;
           case 'snapshotError':
@@ -276,7 +286,7 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
         />
         {loaded ? null : (
           <View style={styles.loader} pointerEvents="none">
-            <ActivityIndicator color={theme.muted} />
+            {spinner ? <ActivityIndicator color={theme.muted} /> : null}
           </View>
         )}
       </View>

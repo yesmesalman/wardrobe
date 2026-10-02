@@ -20,6 +20,7 @@ import {
   VARIANTS,
 } from '../constants';
 import type {Align, GarmentKind, Variant} from '../types';
+import {garmentMask, prepareGarmentMask} from '../ai/garmentMask';
 import {Cutout, GarmentView, GarmentViewHandle, Photo} from './GarmentView';
 import {SegmentedControl} from './SegmentedControl';
 import {ZoomControl} from './ZoomControl';
@@ -87,6 +88,7 @@ export function AddGarmentModal({
   // Start fresh every time a new photo arrives.
   useEffect(() => {
     if (photoBase64) {
+      prepareGarmentMask();
       setVariant(variants[0].value);
       setPickedColor(null);
       setRemoveBackground(true);
@@ -105,11 +107,20 @@ export function AddGarmentModal({
     let cancelled = false;
     setProcessing(true);
     setNotice(null);
-    view.current
-      ?.processPhoto(photoBase64, removeBackground, kind)
+    // The AI model finds the garment; the page falls back to flood-filling
+    // the background without its mask.
+    (removeBackground ? garmentMask(photoBase64) : Promise.resolve(null))
+      .then(aiMask =>
+        cancelled || !view.current
+          ? null
+          : view.current.processPhoto(photoBase64, removeBackground, kind, aiMask),
+      )
       .then(result => {
-        if (cancelled) {
+        if (cancelled || !result) {
           return;
+        }
+        if (__DEV__ && removeBackground) {
+          console.log(`Garment found by: ${result.method ?? 'nothing'}`);
         }
         setCutout(result);
         setAlign(DEFAULT_ALIGN);
@@ -192,6 +203,7 @@ export function AddGarmentModal({
             view={aligning ? 'align' : '3d'}
             onAlignChange={setAlign}
             onViewChange={setScene}
+            spinner={!processing}
             style={styles.view}
           />
           {processing ? (

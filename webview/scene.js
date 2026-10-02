@@ -21,7 +21,8 @@
  *   __setSway(bool)                           sway gently while untouched
  *   __setView('3d' | 'align')                 3D view or 2D alignment view
  *   __setAlign({sx, sy, ox, oy}), __zoomAlign(factor), __resetAlign()
- *   __processPhoto(id, dataUrl, removeBackground, kind)  cut the garment out
+ *   __processPhoto(id, dataUrl, removeBackground, kind, aiMask)  cut the
+ *       garment out (with the AI model's mask if given, else by flood-fill)
  *       and warp it onto each of the kind's models ('shirt' | 'pants')
  *   __snapshot(id)                            JPEG still for library cards
  * and reports back with window.ReactNativeWebView.postMessage.
@@ -1106,11 +1107,61 @@ function wholePhoto(image) {
   };
 }
 
-/** Cuts the garment out of the photo and crops to its outline. */
-function cutOut(image) {
+/**
+ * The AI model's mask (320×320 bytes, base64, from the app) as a background
+ * map at analysis size: everything the model doesn't see as the garment.
+ */
+function aiBackground(aiMask, w, h) {
+  const bytes = Uint8Array.from(atob(aiMask), c => c.charCodeAt(0));
+  const N = Math.round(Math.sqrt(bytes.length));
+  const at = (x, y) => bytes[clamp(y, 0, N - 1) * N + clamp(x, 0, N - 1)];
+  const isBackground = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const sy = ((y + 0.5) * N) / h - 0.5;
+    const y0 = Math.floor(sy);
+    const ty = sy - y0;
+    for (let x = 0; x < w; x++) {
+      const sx = ((x + 0.5) * N) / w - 0.5;
+      const x0 = Math.floor(sx);
+      const tx = sx - x0;
+      const v = lerp(
+        lerp(at(x0, y0), at(x0 + 1, y0), tx),
+        lerp(at(x0, y0 + 1), at(x0 + 1, y0 + 1), tx),
+        ty,
+      );
+      isBackground[y * w + x] = v < 128 ? 1 : 0;
+    }
+  }
+  return isBackground;
+}
+
+/**
+ * Cuts the garment out of the photo and crops to its outline. The garment is
+ * found by the AI model's mask when the app sends one, and otherwise (or if
+ * that finds nothing usable) by flood-filling the plain background from the
+ * photo's border.
+ */
+function cutOut(image, aiMask) {
   const {ctx, w, h} = drawScaled(image, ANALYSIS_SIZE);
   const data = ctx.getImageData(0, 0, w, h).data;
-  const isBackground = findBackground(data, w, h, estimateBackground(data, w, h));
+  const methods = [
+    aiMask && ['ai', () => aiBackground(aiMask, w, h)],
+    [
+      'flood',
+      () => findBackground(data, w, h, estimateBackground(data, w, h)),
+    ],
+  ].filter(Boolean);
+  for (const [method, background] of methods) {
+    const found = garmentFrom(image, data, w, h, background());
+    if (found) {
+      return {...found, method};
+    }
+  }
+  return null;
+}
+
+/** The garment's cut-out from a background map, or null if none was found. */
+function garmentFrom(image, data, w, h, isBackground) {
   const mask = peelFringe(garmentMask(isBackground, w, h), data, w, h);
 
   let count = 0;
@@ -1174,7 +1225,8 @@ function cutOut(image) {
     data: out.toDataURL('image/png'),
     color: dominantColour(data, w, h, mask),
     removed: true,
-    outline: {mask, w, h, box: {x0, y0, x1, y1}},
+    // `photo`: its edges are the photo's, which can cut a garment off.
+    outline: {mask, w, h, box: {x0, y0, x1, y1}, photo: true},
   };
 }
 
@@ -1272,12 +1324,21 @@ function measureShirt(outline) {
   const sleeve = side => {
     const points = [];
     const beyond = bodyWidth / 2 + Math.max(2, 0.03 * k);
+    let cut = false;
     for (let y = box.y0; y <= outline.box.y1; y++) {
       for (let x = box.x0; x <= box.x1; x++) {
         if (mask[y * w + x] && side * (x - cx) > beyond) {
           points.push([(side * (x - cx)) / k, (hem - y) / k]);
+          cut =
+            cut ||
+            (outline.photo &&
+              (x === 0 || x === w - 1 || y === 0 || y === outline.h - 1));
         }
       }
+    }
+    // A sleeve running off the edge of the photo can't be measured.
+    if (cut) {
+      return null;
     }
     // Too few to be a sleeve (a sleeveless top, or a crease at the side).
     if (points.length < 0.002 * bodyWidth * height) {
@@ -1395,7 +1456,9 @@ function measurePants(outline) {
     pants.hemOuter = median(hems.map(([outer]) => outer)) / k;
     pants.hemInner = median(hems.map(([, inner]) => inner)) / k;
   }
-  pants.variant = length > 0.92 ? 'long-pants' : 'shorts';
+  // Legs running off the bottom of the photo are longer than they measure.
+  const cutOff = outline.photo && box.y1 >= outline.h - 2;
+  pants.variant = length > 0.92 || cutOff ? 'long-pants' : 'shorts';
   return pants;
 }
 
@@ -1556,8 +1619,10 @@ function warpOnto(variant, photo, source) {
       ? pantsWarp(marks, photo.marks)
       : shirtWarp(marks, photo.marks);
   const {mask, w: mw, h: mh} = photo.outline;
-  const fx = source.w / mw;
-  const fy = source.h / mh;
+  // Colours come from the photo as taken, before it was turned upright.
+  const {back, w: ow, h: oh} = photo.turn;
+  const fx = source.w / ow;
+  const fy = source.h / oh;
   const out = document.createElement('canvas');
   out.width = target.w;
   out.height = target.h;
@@ -1603,14 +1668,142 @@ function warpOnto(variant, photo, source) {
         continue;
       }
       const i = (y * target.w + x) * 4;
+      const [ox, oy] = back(sx, sy);
       for (let c = 0; c < 3; c++) {
-        px[i + c] = colourAt(sx * fx, sy * fy, c);
+        px[i + c] = colourAt(ox * fx, oy * fy, c);
       }
       px[i + 3] = Math.round(alpha * 255);
     }
   }
   ctx.putImageData(image, 0, 0);
   return out.toDataURL('image/png');
+}
+
+/**
+ * The outline turned by `turns` quarter turns clockwise, plus `back`, which
+ * maps a point of the turned outline to the photo as taken.
+ */
+function turnOutline(outline, turns) {
+  const {mask, w, h} = outline;
+  const turned = turns % 2 ? {w: h, h: w} : {w, h};
+  // Point of the turned outline -> point of the original (continuous pixels).
+  const back = [
+    (x, y) => [x, y],
+    (x, y) => [y, h - x],
+    (x, y) => [w - x, h - y],
+    (x, y) => [w - y, x],
+  ][turns];
+  const out = new Uint8Array(turned.w * turned.h);
+  let x0 = turned.w;
+  let y0 = turned.h;
+  let x1 = -1;
+  let y1 = -1;
+  for (let y = 0; y < turned.h; y++) {
+    for (let x = 0; x < turned.w; x++) {
+      const [ox, oy] = back(x + 0.5, y + 0.5);
+      if (mask[Math.floor(oy) * w + Math.floor(ox)]) {
+        out[y * turned.w + x] = 1;
+        x0 = Math.min(x0, x);
+        x1 = Math.max(x1, x);
+        y0 = Math.min(y0, y);
+        y1 = Math.max(y1, y);
+      }
+    }
+  }
+  return {
+    outline: {
+      mask: out,
+      w: turned.w,
+      h: turned.h,
+      box: {x0, y0, x1, y1},
+      photo: outline.photo,
+    },
+    turn: {turns, back, w, h},
+  };
+}
+
+/**
+ * How much an outline looks like a variant's standard model: both stretched
+ * to the same box, the share of the two silhouettes that overlaps. An upright
+ * shirt is a "T" (wide across the shoulders, narrow at the hem) and pants a
+ * long "Λ", so a garment lying sideways or upside down scores clearly lower.
+ */
+function shapeScore(variant, outline) {
+  const {outline: target} = landmarksOf(variant);
+  const {mask, w, box} = outline;
+  const bw = box.x1 - box.x0 + 1;
+  const bh = box.y1 - box.y0 + 1;
+  const N = 64;
+  let both = 0;
+  let either = 0;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const u = (i + 0.5) / N;
+      const v = (j + 0.5) / N;
+      const inModel =
+        target.mask[Math.floor(v * target.h) * target.w + Math.floor(u * target.w)];
+      const inPhoto =
+        mask[(box.y0 + Math.floor(v * bh)) * w + box.x0 + Math.floor(u * bw)];
+      both += inModel && inPhoto ? 1 : 0;
+      either += inModel || inPhoto ? 1 : 0;
+    }
+  }
+  return both / (either || 1);
+}
+
+/**
+ * The garment turned upright and measured. People photograph garments lying
+ * any way round (the phone held sideways), so each quarter turn is compared
+ * with the kind's standard models, and the best one that can be measured is
+ * kept.
+ */
+function uprightGarment(outline, kind) {
+  const variants = VARIANTS_OF[kind] || VARIANTS_OF.shirt;
+  const turns = [0, 1, 2, 3]
+    .map(t => {
+      const turned = turnOutline(outline, t);
+      const score = Math.max(
+        ...variants.map(variant => shapeScore(variant, turned.outline)),
+      );
+      return {...turned, score};
+    })
+    .sort((a, b) => b.score - a.score);
+  for (const turned of turns) {
+    let marks = null;
+    try {
+      marks =
+        kind === 'pants'
+          ? measurePants(turned.outline)
+          : measureShirt(turned.outline);
+    } catch {
+      marks = null;
+    }
+    if (marks) {
+      if (kind !== 'pants') {
+        // Short or long sleeves: whichever model the outline looks like.
+        marks.variant = variants.reduce((a, b) =>
+          shapeScore(b, turned.outline) > shapeScore(a, turned.outline) ? b : a,
+        );
+        marks.sleeves = plausibleSleeves(marks.sleeves, marks.variant);
+      }
+      return {...turned, marks};
+    }
+  }
+  return null;
+}
+
+/**
+ * Keeps sleeves whose reach suits the variant (a sleeve partly hidden, or
+ * merged with something next to it, measures far too short or long); a
+ * missing sleeve takes the other one's measurements, as garments are
+ * symmetric.
+ */
+function plausibleSleeves(sleeves, variant) {
+  const model = landmarksOf(variant).marks.sleeves[1].reach;
+  const ok = s => s && s.reach > 0.5 * model && s.reach < 1.8 * model;
+  const right = ok(sleeves[1]) ? sleeves[1] : null;
+  const left = ok(sleeves[-1]) ? sleeves[-1] : null;
+  return {1: right || left, [-1]: left || right};
 }
 
 /** The photo's full-size pixels. */
@@ -1629,31 +1822,22 @@ function sourcePixels(image) {
  * photo) for every variant when the garment's outline or landmarks can't be
  * found.
  */
-async function processPhoto(id, dataUrl, removeBackground, kind) {
+async function processPhoto(id, dataUrl, removeBackground, kind, aiMask) {
   try {
     const image = await loadImage(dataUrl);
     const variants = VARIANTS_OF[kind] || VARIANTS_OF.shirt;
-    const result = (removeBackground && cutOut(image)) || wholePhoto(image);
-    let marks = null;
-    if (result.outline) {
-      try {
-        marks =
-          kind === 'pants'
-            ? measurePants(result.outline)
-            : measureShirt(result.outline);
-      } catch {
-        marks = null; // keep the plain cut-out
-      }
-    }
+    const result =
+      (removeBackground && cutOut(image, aiMask)) || wholePhoto(image);
+    // Without landmarks, the plain cut-out is used.
+    const upright = result.outline
+      ? uprightGarment(result.outline, kind)
+      : null;
+    const marks = upright ? upright.marks : null;
     const cutouts = {};
-    if (marks) {
+    if (upright) {
       const source = sourcePixels(image);
       variants.forEach(variant => {
-        cutouts[variant] = warpOnto(
-          variant,
-          {outline: result.outline, marks},
-          source,
-        );
+        cutouts[variant] = warpOnto(variant, upright, source);
       });
     } else {
       variants.forEach(variant => {
@@ -1666,6 +1850,7 @@ async function processPhoto(id, dataUrl, removeBackground, kind) {
       cutouts,
       color: result.color,
       removed: result.removed,
+      method: result.method || null,
       variant: marks ? marks.variant : null,
     });
   } catch (e) {

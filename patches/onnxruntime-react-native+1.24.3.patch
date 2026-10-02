@@ -1,0 +1,32 @@
+diff --git a/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm b/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm
+index 8155f92..d905764 100644
+--- a/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm
++++ b/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm
+@@ -10,6 +10,12 @@
+ #import <ReactCommon/RCTTurboModule.h>
+ #import <jsi/jsi.h>
+ 
++// React Native's new architecture (the only one since 0.82) has no
++// RCTCxxBridge: modules get an RCTBridgeProxy, which hands out the JS runtime.
++@protocol OnnxruntimeRuntimeProvider
++- (void *)runtime;
++@end
++
+ @implementation OnnxruntimeModule
+ 
+ @synthesize bridge = _bridge;
+@@ -27,12 +33,11 @@ - (void)setBridge:(RCTBridge*)bridge {
+  */
+ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(install) {
+   @try {
+-    RCTCxxBridge* cxxBridge = (RCTCxxBridge*)_bridge;
+-    if (cxxBridge == nil) {
++    if (_bridge == nil) {
+       return @false;
+     }
+ 
+-    auto jsiRuntime = (facebook::jsi::Runtime*)cxxBridge.runtime;
++    auto jsiRuntime = (facebook::jsi::Runtime*)[(id<OnnxruntimeRuntimeProvider>)_bridge runtime];
+     if (jsiRuntime == nil) {
+       return @false;
+     }
