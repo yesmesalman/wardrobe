@@ -3,9 +3,8 @@
  * shorts) as plain vertex arrays. The garments are lofted from smooth
  * cross-sections, so they are reproducible and dependency free.
  *
- * Each garment can be reshaped to match the one in the user's photo: a
- * `shape` (see SHAPES) sets its length, sleeves or legs. Without one, the
- * variant's default proportions are used.
+ * Every garment of a variant uses the same standard model; the user's photo
+ * is warped to fit it (see webview/scene.js).
  *
  * Shared by the 3D scene (webview/scene.js, which builds the garments at
  * runtime) and the camera's guide outline (src/components/GuidedCamera.tsx).
@@ -18,9 +17,8 @@
 
 const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
-const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const smoothstep = t => {
-  const c = clamp(t, 0, 1);
+  const c = Math.min(1, Math.max(0, t));
   return c * c * (3 - 2 * c);
 };
 
@@ -63,98 +61,37 @@ const normalize = v => {
 };
 
 // ---------------------------------------------------------------------------
-// Shapes: what can be fitted to a photo, with defaults and limits
+// Standard proportions
 // ---------------------------------------------------------------------------
 
 /**
- * Model proportions the photo is measured against. All lengths are in model
- * units; the shirt body is 2 × SHIRT.halfWidth wide and the pants' waist
- * 2 × PANTS.waistHalf, and those stay fixed (so a shirt always covers the
- * pants' waistband in the Outfit). Everything else scales with the photo.
+ * The standard shirt, in model units: the hem at y = 0, the collar's top at
+ * `length`. The body is a little wider than the pants' waist, which it covers
+ * in the Outfit view.
  */
 const SHIRT = {
+  length: 0.725,
   halfWidth: 0.22,
-  // The body's half width as it looks from the front: its folds make it a
-  // little wider. Photos are measured against this.
-  flatHalfWidth: 0.224,
   // Shoulder point: x from the centre, and how far below the collar's top.
+  // The shoulder line slopes about 26 degrees from the collar down to it.
   shoulderX: 0.256,
   shoulderDrop: 0.0858,
-  shoulderSlope: 0.49, // about 26 degrees
+  shoulderSlope: 0.49,
+  // Sleeves hang from the shoulder point, angled below horizontal.
+  sleeveAngle: 46,
   sleeveRadius: 0.086,
+  sleeveLength: {short: 0.19, long: 0.6},
 };
+
+/**
+ * The standard pants: the waist at y = 1, the crotch point (fork) `rise`
+ * below it, the hem `length` below it.
+ */
 const PANTS = {
   waistHalf: 0.198,
-  // As they look from the front: the legs overlap a little below the fork
-  // before they part, and the wrinkles at the hem widen each leg.
-  crotchGap: 0.041,
-  hemFolds: 0.006,
+  rise: 0.34,
+  length: {long: 1.14, shorts: 0.7},
 };
-
-/**
- * Per variant: the default shape and the range each value is held to.
- *  shirts: length (collar to hem), sleeveLength, sleeveAngle (degrees below
- *          horizontal)
- *  pants:  length (waist to hem), rise (waist to crotch), hemOuter (from the
- *          centre to a leg's outer edge at the hem), hemHalf (half a leg's
- *          width at the hem)
- */
-const SHAPES = {
-  'short-sleeve': {
-    defaults: {length: 0.725, sleeveLength: 0.19, sleeveAngle: 46},
-    limits: {
-      length: [0.55, 0.95],
-      sleeveLength: [0.1, 0.34],
-      sleeveAngle: [30, 65],
-    },
-  },
-  'long-sleeve': {
-    defaults: {length: 0.725, sleeveLength: 0.6, sleeveAngle: 46},
-    limits: {
-      length: [0.55, 0.95],
-      sleeveLength: [0.4, 0.75],
-      sleeveAngle: [30, 65],
-    },
-  },
-  'long-pants': {
-    defaults: {length: 1.14, rise: 0.34, hemOuter: 0.172, hemHalf: 0.051},
-    limits: {
-      length: [0.9, 1.45],
-      rise: [0.24, 0.44],
-      hemOuter: [0.11, 0.27],
-      hemHalf: [0.04, 0.11],
-    },
-  },
-  shorts: {
-    defaults: {length: 0.7, rise: 0.34, hemOuter: 0.204, hemHalf: 0.092},
-    limits: {
-      length: [0.46, 0.88],
-      rise: [0.24, 0.44],
-      hemOuter: [0.15, 0.27],
-      hemHalf: [0.07, 0.13],
-    },
-  },
-};
-
-/**
- * The shape a garment is built with: the measured `shape` (if any) held to the
- * variant's limits, with defaults for anything missing.
- */
-function resolveShape(variant, shape) {
-  const spec = SHAPES[variant] || SHAPES['short-sleeve'];
-  const out = {};
-  Object.keys(spec.defaults).forEach(key => {
-    const value = shape && Number.isFinite(shape[key]) ? shape[key] : null;
-    const [min, max] = spec.limits[key];
-    out[key] = value === null ? spec.defaults[key] : clamp(value, min, max);
-  });
-  if ('rise' in out) {
-    // Legs keep some length below the crotch; legs don't cross at the hem.
-    out.rise = Math.min(out.rise, out.length - 0.2);
-    out.hemOuter = Math.max(out.hemOuter, 2 * out.hemHalf + 0.006);
-  }
-  return out;
-}
 
 // ---------------------------------------------------------------------------
 // Mesh building
@@ -271,14 +208,14 @@ function ringTube(points, radius, segments = 8) {
 // ---------------------------------------------------------------------------
 
 /**
- * Where a shirt's sleeve sits: the shoulder point (the sleeve's top edge
- * passes through it), the sleeve's direction and its "up" side.
+ * Where a shirt's sleeves sit: the shoulder point (the sleeve's top edge
+ * passes through it), the sleeve's direction and its "up" side, for the
+ * right-hand sleeve (mirror x for the left).
  */
-function sleeveFrame(shape) {
-  const shoulder = [SHIRT.shoulderX, shape.length - SHIRT.shoulderDrop];
-  const tilt = shape.sleeveAngle * DEG;
+function sleeveFrame() {
+  const tilt = SHIRT.sleeveAngle * DEG;
   return {
-    shoulder,
+    shoulder: [SHIRT.shoulderX, SHIRT.length - SHIRT.shoulderDrop],
     dir: [Math.cos(tilt), -Math.sin(tilt)],
     up: [Math.sin(tilt), Math.cos(tilt)],
   };
@@ -288,19 +225,16 @@ function sleeveFrame(shape) {
  * Short-sleeve tee, or a long-sleeve shirt with sleeves angled down to the
  * cuff. A flat-lay tee: a boxy body with straight sides, shoulders on one
  * straight line sloping from the collar to the shoulder point, sleeves
- * hanging from it with a natural gap under the arm.
+ * hanging from it with a natural gap under the arm (a short sleeve is the
+ * first stretch of a long one).
  */
-function buildShirt(variant = 'short-sleeve', measured = null) {
-  const long = variant === 'long-sleeve';
-  const shape = resolveShape(long ? 'long-sleeve' : 'short-sleeve', measured);
+function buildShirt({long = false} = {}) {
   const mesh = new Mesh();
   const RING = 72;
   const ROWS = 80;
-  const TOP = shape.length;
-  // Everything from the chest up moves with the collar.
-  const lift = TOP - SHAPES['short-sleeve'].defaults.length;
+  const TOP = SHIRT.length;
 
-  const {shoulder, dir, up} = sleeveFrame(shape);
+  const {shoulder, dir, up} = sleeveFrame();
   const SLOPE = SHIRT.shoulderSlope;
   const seamY = x => shoulder[1] + (shoulder[0] - x) * SLOPE;
   const seamX = y => shoulder[0] - (y - shoulder[1]) / SLOPE;
@@ -309,35 +243,33 @@ function buildShirt(variant = 'short-sleeve', measured = null) {
   // to the armpit; above that the width follows the shoulder line. The body
   // is a little wider than the pants' waist, which it covers in the Outfit
   // view (the hem hangs 0.13 below the waistband there).
-  const w = SHIRT.halfWidth;
   const torso = [
-    [0.0, w, 0.096],
-    [0.42 + lift, w, 0.098],
-    [0.64 + lift, w + 0.005, 0.098],
-    [0.667 + lift, w + 0.005, 0.092],
-    [0.685 + lift, w + 0.005, 0.078],
-    [0.712 + lift, w + 0.005, 0.064],
+    [0.0, 0.22, 0.096],
+    [0.42, 0.22, 0.098],
+    [0.64, 0.225, 0.098],
+    [0.667, 0.225, 0.092],
+    [0.685, 0.225, 0.078],
+    [0.712, 0.225, 0.064],
     [TOP, 0.09, 0.06],
   ];
-  const neckStart = 0.6 + lift;
 
   const torsoRows = [];
   for (let r = 0; r < ROWS; r++) {
     const y = (r / (ROWS - 1)) * TOP;
     const [pw, d] = profile(torso, y);
-    const width = Math.min(pw, Math.max(0.09, seamX(y)));
-    const neckBlend = smoothstep((y - neckStart) / (TOP - neckStart));
+    const w = Math.min(pw, Math.max(0.09, seamX(y)));
+    const neckBlend = smoothstep((y - 0.6) / (TOP - 0.6));
     const ring = [];
     for (let i = 0; i < RING; i++) {
       const theta = (i / RING) * TAU;
-      let [x, z] = superEllipse(theta, width, d);
+      let [x, z] = superEllipse(theta, w, d);
       // Soft fabric folds, strongest near the hem.
       const fold =
         0.006 *
         (Math.sin(11 * theta + 6 * y) +
           0.6 * Math.sin(17 * theta - 9 * y + 1.3)) *
         (0.35 + 0.65 * (1 - y / TOP));
-      x *= 1 + fold / width;
+      x *= 1 + fold / w;
       z *= 1 + fold / d;
       // Lower neckline at the front, slightly at the back.
       const s = Math.sin(theta);
@@ -365,7 +297,7 @@ function buildShirt(variant = 'short-sleeve', measured = null) {
       shoulder[1] - up[1] * r0,
       0,
     ];
-    const length = shape.sleeveLength;
+    const length = long ? SHIRT.sleeveLength.long : SHIRT.sleeveLength.short;
     const rows = [];
     for (let r = 0; r < SLEEVE_ROWS; r++) {
       const s = -INSET + (r / (SLEEVE_ROWS - 1)) * (length + INSET);
@@ -419,31 +351,19 @@ function buildShirt(variant = 'short-sleeve', measured = null) {
  * Full-length pants, or shorts that stop at the knee.
  *
  * Proportions follow a flat-lay of slim jeans: the waist is at y = 1 and the
- * crotch point (fork) is high. Above it the legs overlap and merge into the
- * hips; below it they part in a narrow V that widens steadily to a slim hem.
- * The tables below describe the default shape; a fitted shape moves the fork
- * and the hem (stretching the garment between them) and the legs' hem width
- * and spread (blending in from nothing at the fork).
+ * crotch point (fork) is high, at y = FORK. Above it the legs overlap and
+ * merge into the hips; below it they part in a narrow V that widens steadily
+ * to a slim hem. Long pants hang to y = -0.14, so the inseam (FORK to hem,
+ * 0.8) is about 70% of the whole length, as on real jeans.
  */
-function buildPants(variant = 'long-pants', measured = null) {
-  const shorts = variant === 'shorts';
-  const shape = resolveShape(shorts ? 'shorts' : 'long-pants', measured);
-  const base = SHAPES[shorts ? 'shorts' : 'long-pants'].defaults;
+function buildPants({shorts = false} = {}) {
   const mesh = new Mesh();
   const RING = 64;
   const TOP = 1.0;
-  const FORK = 1 - base.rise;
+  const FORK = TOP - PANTS.rise;
   const HIP_BOTTOM = 0.62;
   const LEG_TOP = 0.76;
-  const LEG_BOTTOM = 1 - base.length;
-
-  // The default shape is stretched so its fork and hem land on the fitted ones.
-  const fork = TOP - shape.rise;
-  const bottom = TOP - shape.length;
-  const mapY = y =>
-    y < FORK
-      ? bottom + ((y - LEG_BOTTOM) / (FORK - LEG_BOTTOM)) * (fork - bottom)
-      : fork + ((y - FORK) / (TOP - FORK)) * (TOP - fork);
+  const LEG_BOTTOM = TOP - (shorts ? PANTS.length.shorts : PANTS.length.long);
 
   // Waist to hip: [y, half width, half depth]. The bottom of the hip tube is
   // no deeper than the two legs joined together, so it disappears inside them.
@@ -465,7 +385,7 @@ function buildPants(variant = 'long-pants', measured = null) {
     for (let i = 0; i < RING; i++) {
       const theta = (i / RING) * TAU;
       const [x, z] = superEllipse(theta, w + band, d + band, 2.5);
-      ring.push([x, mapY(y), z]);
+      ring.push([x, y, z]);
     }
     hipRows.push(ring);
   }
@@ -497,20 +417,12 @@ function buildPants(variant = 'long-pants', measured = null) {
     [0.7, 0.105, 0.115, 0.122],
     [LEG_TOP, 0.1, 0.118, 0.118],
   ];
-  // The fitted hem: its leg width and centre, blended in from the fork down.
-  const [hemCx, hemW] = profile(leg, LEG_BOTTOM);
-  const fitCx = shape.hemOuter - shape.hemHalf - hemCx;
-  const fitW = shape.hemHalf - hemW;
   const LEG_ROWS = 48;
   [1, -1].forEach(side => {
     const rows = [];
     for (let r = 0; r < LEG_ROWS; r++) {
       const y = LEG_BOTTOM + (r / (LEG_ROWS - 1)) * (LEG_TOP - LEG_BOTTOM);
-      const t = y < FORK ? (FORK - y) / (FORK - LEG_BOTTOM) : 0;
-      const [baseCx, baseW, baseD] = profile(leg, y);
-      const cx = baseCx + fitCx * t;
-      const w = baseW + fitW * t;
-      const d = baseD * (w / baseW);
+      const [cx, w, d] = profile(leg, y);
       const ring = [];
       for (let i = 0; i < RING; i++) {
         const theta = (i / RING) * TAU;
@@ -522,7 +434,7 @@ function buildPants(variant = 'long-pants', measured = null) {
           Math.max(0, 1 - (y - LEG_BOTTOM) / (LEG_TOP - LEG_BOTTOM)) ** 1.5;
         x += Math.sign(x) * fold;
         z += Math.sign(z) * fold;
-        ring.push([side * cx + x, mapY(y), z]);
+        ring.push([side * cx + x, y, z]);
       }
       rows.push(ring);
     }
@@ -533,9 +445,9 @@ function buildPants(variant = 'long-pants', measured = null) {
   return {
     mesh,
     name: 'Pants',
-    // Front of the left thigh.
+    // Front of the left thigh (about y = 0.64 above the hem line).
     decal: {
-      position: [0.105, mapY(0.64) - mid[1], 0.14],
+      position: [0.105, 0.64 - mid[1], 0.14],
       rotation: [0, 0, 0],
       scale: [0.17, 0.17, 0.3],
     },
@@ -543,11 +455,18 @@ function buildPants(variant = 'long-pants', measured = null) {
   };
 }
 
-/** Builds the garment for a variant, fitted to `shape` when given. */
-function buildGarment(variant, shape) {
-  return variant === 'long-pants' || variant === 'shorts'
-    ? buildPants(variant, shape)
-    : buildShirt(variant, shape);
+/** Builds the standard garment for a variant. */
+function buildGarment(variant) {
+  switch (variant) {
+    case 'long-sleeve':
+      return buildShirt({long: true});
+    case 'long-pants':
+      return buildPants();
+    case 'shorts':
+      return buildPants({shorts: true});
+    default:
+      return buildShirt();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -555,25 +474,23 @@ function buildGarment(variant, shape) {
 // ---------------------------------------------------------------------------
 
 /**
- * The default garment seen flat from the front, as closed polygons of [x, y]
- * points (y up) for the camera's guide outline:
- *   shirt: {outline, cuffs: [[a, b], ...]}  the long-sleeve shirt, plus where
- *          a short sleeve ends
- *   pants: {outline, cuffs}                 the long pants, plus where shorts
- *          end
+ * The standard garment seen flat from the front, as a closed polygon of
+ * [x, y] points (y up) for the camera's guide outline, plus lines across it
+ * where a shorter variant ends:
+ *   shirt: the long-sleeve shirt; `cuffs` where a short sleeve ends
+ *   pants: the long pants; `cuffs` where shorts end
  */
 function frontOutline(kind) {
   if (kind === 'pants') {
-    const {length, rise, hemOuter, hemHalf} = SHAPES['long-pants'].defaults;
-    const shortsLength = SHAPES.shorts.defaults.length;
     const top = 1;
-    const fork = top - rise;
-    const hem = top - length;
-    const waist = PANTS.waistHalf;
+    const fork = top - PANTS.rise;
+    const hem = top - PANTS.length.long;
+    // The long pants' leg at the hem (see jeansLeg in buildPants).
+    const hemOuter = 0.121 + 0.051;
+    const inner = 0.121 - 0.051;
     const hip = 0.228;
-    const inner = hemOuter - 2 * hemHalf;
     const right = [
-      [waist, top],
+      [PANTS.waistHalf, top],
       [hip, 0.76],
       [hip - 0.008, fork - 0.06],
       [hemOuter, hem],
@@ -585,7 +502,7 @@ function frontOutline(kind) {
       ...right.reverse().map(([x, y]) => [-x, y]),
     ];
     // Where shorts end: across each leg at that height.
-    const y = top - shortsLength;
+    const y = top - PANTS.length.shorts;
     const k = (fork - y) / (fork - hem);
     const outerAt = hip - 0.008 + (hemOuter - hip + 0.008) * k;
     const innerAt = inner * k;
@@ -604,9 +521,7 @@ function frontOutline(kind) {
     };
   }
 
-  const long = resolveShape('long-sleeve', null);
-  const short = resolveShape('short-sleeve', null);
-  const {shoulder, dir, up} = sleeveFrame(long);
+  const {shoulder, dir, up} = sleeveFrame();
   const r0 = SHIRT.sleeveRadius;
   const root = [shoulder[0] - up[0] * r0, shoulder[1] - up[1] * r0];
   const along = (s, r) => [
@@ -619,35 +534,26 @@ function frontOutline(kind) {
   const armpit = [SHIRT.halfWidth, under[1] + dir[1] * toSide];
   const cuff = r0 - 0.038;
   const right = [
-    [0.09, long.length],
+    [0.09, SHIRT.length],
     shoulder,
-    along(long.sleeveLength, cuff),
-    along(long.sleeveLength, -cuff),
+    along(SHIRT.sleeveLength.long, cuff),
+    along(SHIRT.sleeveLength.long, -cuff),
     armpit,
     [SHIRT.halfWidth, 0],
   ];
   const outline = [
-    [0, long.length - 0.04],
+    [0, SHIRT.length - 0.04],
     ...right,
-    ...right.reverse().map(([x, yy]) => [-x, yy]),
+    ...right.reverse().map(([x, y]) => [-x, y]),
   ];
   const shortEnd = [
-    along(short.sleeveLength, r0),
-    along(short.sleeveLength, -r0),
+    along(SHIRT.sleeveLength.short, r0),
+    along(SHIRT.sleeveLength.short, -r0),
   ];
   return {
     outline,
-    cuffs: [shortEnd, shortEnd.map(([x, yy]) => [-x, yy])],
+    cuffs: [shortEnd, shortEnd.map(([x, y]) => [-x, y])],
   };
 }
 
-module.exports = {
-  SHIRT,
-  PANTS,
-  SHAPES,
-  resolveShape,
-  buildGarment,
-  buildShirt,
-  buildPants,
-  frontOutline,
-};
+module.exports = {SHIRT, PANTS, buildGarment, frontOutline};

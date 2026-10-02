@@ -9,7 +9,7 @@ import React, {
 import {ActivityIndicator, StyleSheet, View, ViewStyle} from 'react-native';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
 import {DEFAULT_ALIGN, theme} from '../constants';
-import type {Align, GarmentKind, GarmentShape, PhotoMode, Variant} from '../types';
+import type {Align, GarmentKind, PhotoMode, Variant} from '../types';
 import {SCENE_HTML} from '../webview/sceneHtml';
 
 export interface Photo {
@@ -18,22 +18,26 @@ export interface Photo {
 }
 
 export interface Cutout {
-  /** Base64 PNG of the garment cropped to its outline. */
-  base64: string;
+  /**
+   * Base64 PNG of the garment for each of the kind's variants, warped into
+   * the shape of that variant's standard model.
+   */
+  images: Partial<Record<Variant, string>>;
   /** Main colour of the garment (hex). */
   color: string;
   /** False when the background could not be removed (whole photo used). */
   removed: boolean;
-  /** The garment's proportions, measured from its outline (if it was found). */
-  shape: GarmentShape | null;
-  /** The variant those proportions look like (e.g. long sleeves). */
+  /** The variant the garment looks like (e.g. long sleeves), if measured. */
   variant: Variant | null;
 }
 
 export interface GarmentViewHandle {
   /** Base64 JPEG still of the garment, in the pose used on library cards. */
   snapshot: () => Promise<string>;
-  /** Cuts the garment out of a photo (base64 JPEG) for "fit" mode and measures it. */
+  /**
+   * Cuts the garment out of a photo (base64 JPEG) for "fit" mode and warps it
+   * onto each of the kind's standard models.
+   */
   processPhoto: (
     photoBase64: string,
     removeBackground: boolean,
@@ -47,8 +51,6 @@ export interface GarmentViewHandle {
 
 interface Props {
   variant: Variant;
-  /** Reshapes the blank model to the garment's measured proportions. */
-  shape?: GarmentShape | null;
   color: string;
   /** Fit mode: the cut-out (PNG). Print mode: the photo (JPEG). */
   photo?: Photo | null;
@@ -83,7 +85,6 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
   function GarmentViewImpl(
     {
       variant,
-      shape = null,
       color,
       photo,
       mode = 'print',
@@ -109,7 +110,6 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
 
     // Model, photo and mode: the page swaps the garment when any changes.
     const photoUri = photo ? `data:${photo.mime};base64,${photo.base64}` : null;
-    const shapeJson = JSON.stringify(shape);
     const initialAlign = useRef(align);
     initialAlign.current = align;
     useEffect(() => {
@@ -118,14 +118,13 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
         run(
           `window.__setGarment(${JSON.stringify({
             variant,
-            shape: JSON.parse(shapeJson),
             photo: photoUri,
             mode,
             align: initialAlign.current,
           })})`,
         );
       }
-    }, [ready, variant, shapeJson, photoUri, mode, run]);
+    }, [ready, variant, photoUri, mode, run]);
 
     useEffect(() => {
       if (ready) {
@@ -236,10 +235,13 @@ export const GarmentView = forwardRef<GarmentViewHandle, Props>(
             break;
           case 'cutout':
             settle(message.id, true, {
-              base64: stripDataUrl(message.data),
+              images: Object.fromEntries(
+                Object.entries(message.cutouts as Record<string, string>).map(
+                  ([key, data]) => [key, stripDataUrl(data)],
+                ),
+              ),
               color: message.color,
               removed: message.removed,
-              shape: message.shape ?? null,
               variant: message.variant ?? null,
             } satisfies Cutout);
             break;

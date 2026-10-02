@@ -7,14 +7,7 @@ import {
   saveGarmentFiles,
   saveGarments,
 } from '../storage/wardrobeStorage';
-import type {
-  Align,
-  Garment,
-  GarmentKind,
-  GarmentShape,
-  PhotoMode,
-  Variant,
-} from '../types';
+import type {Align, Garment, GarmentKind, PhotoMode, Variant} from '../types';
 
 export interface NewGarment {
   kind: GarmentKind;
@@ -22,8 +15,6 @@ export interface NewGarment {
   mode: PhotoMode;
   color: string;
   align: Align;
-  /** Proportions measured from the photo; absent for the default model. */
-  shape?: GarmentShape | null;
   /** Base64 JPEG of the user's photo. */
   photoBase64: string;
   /** Base64 PNG of the garment cut out of the photo (fit mode). */
@@ -65,7 +56,7 @@ export function useWardrobe() {
   );
 
   const add = useCallback(
-    async ({kind, variant, mode, color, align, shape, ...images}: NewGarment) => {
+    async ({kind, variant, mode, color, align, ...images}: NewGarment) => {
       if (counts[kind] >= MAX_PER_KIND) {
         throw new Error(`You can only keep ${MAX_PER_KIND} of each garment.`);
       }
@@ -78,7 +69,6 @@ export function useWardrobe() {
         mode,
         color,
         align,
-        shape,
         createdAt: Date.now(),
         ...files,
       };
